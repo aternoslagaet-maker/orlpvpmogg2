@@ -17,7 +17,7 @@ public final class HudOverlay {
 
     public static void render(DrawContext context) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null || client.options.hideGui) {
+        if (client.player == null) {
             return;
         }
 
