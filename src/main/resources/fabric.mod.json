@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "orlpvpmogg",
+  "version": "${version}",
+  "name": "ORL PvP Attribute Swap History",
+  "description": "Записывает историю атрибут-свапов (смены предмета в руке), считает время между свапами и между свапами копья. HUD + окно истории по настраиваемой клавише.",
+  "authors": [
+    "Ronin"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "org.example.ronin.OrlPvpClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
