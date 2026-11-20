@@ -2,15 +2,15 @@ package org.example.ronin;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
 
 import java.util.Optional;
 
 public final class HudOverlay {
 
-    private static final int COLOR_TITLE = 0xFF55FFFF;
     private static final int COLOR_TEXT = 0xFFFFFFFF;
-    private static final int COLOR_SPEAR = 0xFF55FF55;
-    private static final int COLOR_BACKGROUND = 0x90000000;
+    private static final int COLOR_SPEAR = 0xFF45FF45;
+    private static final int COLOR_BACKGROUND = 0x64000000;
 
     private HudOverlay() {
     }
@@ -21,50 +21,42 @@ public final class HudOverlay {
             return;
         }
 
-        String[] lines = buildLines();
-
-        int lineHeight = 10;
-        int width = 0;
-        for (String line : lines) {
-            width = Math.max(width, client.textRenderer.getWidth(line));
+        Optional<SwapHistory.SwapRecord> last = SwapHistory.last();
+        if (last.isEmpty()) {
+            return;
         }
-        context.fill(0, 0, width + 8, lines.length * lineHeight + 6, COLOR_BACKGROUND);
 
-        int y = 4;
-        for (int i = 0; i < lines.length; i++) {
-            int color = switch (i) {
-                case 0 -> COLOR_TITLE;
-                case 2 -> COLOR_SPEAR;
-                default -> COLOR_TEXT;
-            };
-            context.drawTextWithShadow(client.textRenderer, lines[i], 4, y, color);
-            y += lineHeight;
+        SwapHistory.SwapRecord r = last.get();
+
+        String delta = "Δ " + SwapHistory.formatDuration(r.intervalMs());
+        String spearDelta = SwapHistory.getLastSpearInterval() >= 0
+                ? "Δ копьё " + SwapHistory.formatDuration(SwapHistory.getLastSpearInterval())
+                : "";
+
+        int iconSize = 16;
+        int pad = 3;
+        int textX = pad + iconSize + pad + 6 + iconSize + pad + 2;
+        int width = textX + Math.max(client.textRenderer.getWidth(delta),
+                spearDelta.isEmpty() ? 0 : client.textRenderer.getWidth(spearDelta)) + pad;
+        int height = pad + iconSize + pad + 11 + pad;
+
+        context.fill(0, 0, width, height, COLOR_BACKGROUND);
+
+        drawStack(context, r.from(), pad, pad);
+        context.drawTextWithShadow(client.textRenderer, "→", pad + iconSize + 1, pad + 4, COLOR_TEXT);
+        drawStack(context, r.to(), pad + iconSize + pad + 4, pad);
+
+        context.drawTextWithShadow(client.textRenderer, delta, textX, pad + 1, COLOR_TEXT);
+        if (!spearDelta.isEmpty()) {
+            context.drawTextWithShadow(client.textRenderer, spearDelta, textX, pad + iconSize - 1, COLOR_SPEAR);
         }
     }
 
-    private static String[] buildLines() {
-        Optional<SwapHistory.SwapRecord> last = SwapHistory.last();
-        long count = SwapHistory.getCount();
-        long spearCount = SwapHistory.getSpearCount();
-        double average = SwapHistory.getAverageInterval();
-
-        String lastSwap = last
-                .map(r -> r.from() + " -> " + r.to())
-                .orElse("--");
-        String lastInterval = last
-                .map(r -> SwapHistory.formatInterval(r.intervalMs()))
-                .orElse("--");
-        String spearInterval = SwapHistory.formatDuration(SwapHistory.getLastSpearInterval());
-        String ago = last
-                .map(r -> SwapHistory.formatDuration(System.currentTimeMillis() - r.timeMs()) + " назад")
-                .orElse("--");
-
-        return new String[]{
-                "Атрибут-свапы [O]",
-                lastSwap + " (" + ago + ")",
-                "Свапов: " + count + " | копьё: " + spearCount,
-                "Δ: " + lastInterval + " | копьё: " + spearInterval,
-                "Средний Δ: " + (average < 0 ? "--" : String.format("%.2f с", average / 1000.0))
-        };
+    private static void drawStack(DrawContext context, ItemStack stack, int x, int y) {
+        if (stack != null && !stack.isEmpty()) {
+            context.drawItem(stack, x, y);
+        } else {
+            context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, "—", x + 5, y + 4, 0xFF888888);
+        }
     }
 }
