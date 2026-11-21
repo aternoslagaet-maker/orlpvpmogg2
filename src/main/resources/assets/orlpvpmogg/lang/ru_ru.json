@@ -1,3 +1,5 @@
 {
-  "key.orlpvpmogg.open_history": "Открыть историю атрибут-свапов"
+  "key.orlpvpmogg.open_history": "Открыть историю свапов",
+  "key.orlpvpmogg.toggle_hud_profile": "Переключить профиль HUD",
+  "category.orlpvpmogg": "ORL PvP"
 }

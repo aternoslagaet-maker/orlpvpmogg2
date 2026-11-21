@@ -2,9 +2,13 @@ package org.example.ronin;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.entity.player.ItemCooldownManager;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +19,7 @@ public final class SwapTracker {
 
     public static final long LUNGE_ATTACK_WINDOW_MS = 400;
     public static final long REACH_ATTACK_WINDOW_MS = 150;
+    public static final float AIM_GREEN_MAX_DEG = 5.0f;
 
     private static ItemStack lastStack = ItemStack.EMPTY;
     private static boolean lastAttackKeyDown = false;
@@ -57,17 +62,61 @@ public final class SwapTracker {
         boolean meaningful = (SwapHistory.isWeapon(from) && SwapHistory.isWeapon(current))
                 || lungeSwap || reachSwap;
 
-        if (meaningful) {
-            ItemCooldownManager cooldowns = player.getItemCooldownManager();
-            boolean fromOnCooldown = cooldowns.isCoolingDown(from);
-            SwapHistory.record(from, current, fromOnCooldown, lungeSwap, reachSwap, attackGapMs);
-            LOGGER.info("Свап: {} -> {} (рывок: {}, дальность: {}, КД снятого: {}, удар {} мс назад)",
-                    itemId(from), itemId(current), lungeSwap, reachSwap, fromOnCooldown,
-                    attackGapMs < 0 ? "нет" : String.valueOf(attackGapMs));
-        } else {
+        if (!meaningful) {
             LOGGER.info("Смена предмета: {} -> {} (не записано: обычный свап без атаки)",
                     itemId(from), itemId(current));
+            return;
         }
+
+        ItemCooldownManager cooldowns = player.getItemCooldownManager();
+        boolean fromOnCooldown = cooldowns.isCoolingDown(from);
+        float pitchDeg = player.getPitch(1.0f);
+        SwapHistory.record(from, current, fromOnCooldown, lungeSwap, reachSwap, attackGapMs, pitchDeg);
+
+        LOGGER.info("Свап: {} -> {} (рывок: {}, дальность: {}, КД снятого: {}, удар {} мс назад, аим {}°)",
+                itemId(from), itemId(current), lungeSwap, reachSwap, fromOnCooldown,
+                attackGapMs < 0 ? "нет" : String.valueOf(attackGapMs));
+
+        if (lungeSwap) {
+            playLungeSound(client, !fromOnCooldown, pitchDeg);
+            updateGoal(client, player, !fromOnCooldown, pitchDeg);
+        }
+    }
+
+    private static void playLungeSound(MinecraftClient client, boolean effective, float pitchDeg) {
+        if (!SwapConfig.soundEnabled) {
+            return;
+        }
+        float volume = SwapConfig.soundVolume();
+        boolean greenAim = Math.abs(pitchDeg) <= AIM_GREEN_MAX_DEG;
+        float pitch = effective ? (greenAim ? 1.5f : 1.2f) : 0.4f;
+        float playVolume = effective ? volume : Math.max(0.02f, volume * 0.25f);
+        client.getSoundManager().play(PositionedSoundInstance.ui(
+                SoundEvents.UI_BUTTON_CLICK.value(), pitch, playVolume));
+    }
+
+    private static void updateGoal(MinecraftClient client, ClientPlayerEntity player,
+                                   boolean effective, float pitchDeg) {
+        SwapConfig.Goal goal = SwapConfig.currentGoal();
+        if (SwapConfig.goalCompleted || goal == null) {
+            return;
+        }
+        boolean greenAim = Math.abs(pitchDeg) <= AIM_GREEN_MAX_DEG;
+        SwapHistory.SwapRecord lunge = SwapHistory.lastLunge().orElse(null);
+        if (lunge == null || lunge.intervalMs() < 0 || lunge.intervalMs() > goal.maxDeltaMs()
+                || !effective || (goal.needGreenAim() && !greenAim)) {
+            SwapConfig.goalProgress = 0;
+            SwapConfig.save();
+            return;
+        }
+        SwapConfig.goalProgress++;
+        if (SwapConfig.goalProgress >= goal.count()) {
+            SwapConfig.goalCompleted = true;
+            player.sendMessage(Text.literal("✅ Цель выполнена: " + goal.name() + "!").formatted(Formatting.GOLD), true);
+            client.getSoundManager().play(PositionedSoundInstance.ui(
+                    SoundEvents.UI_BUTTON_CLICK.value(), 1.8f, SwapConfig.soundVolume()));
+        }
+        SwapConfig.save();
     }
 
     public static boolean matchesSlot(int slot, ItemStack stack) {

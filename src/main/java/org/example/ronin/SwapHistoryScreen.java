@@ -15,13 +15,22 @@ import java.util.List;
 
 public class SwapHistoryScreen extends Screen {
 
+    private static final int TAB_HISTORY = 0;
+    private static final int TAB_STATS = 1;
+    private static final int TAB_SETTINGS = 2;
+
     private static final int ROWS_PER_PAGE = 8;
     private static final int ROW_HEIGHT = 22;
     private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("HH:mm:ss");
 
+    private static final int[] AIM_COLORS = {0xFF45FF45, 0xFFFFFF55, 0xFFFFA555, 0xFFFF5555};
+    private static final String[] AIM_NAMES = {"зелёный", "жёлтый", "оранжевый", "красный"};
+
+    private int tab = TAB_HISTORY;
     private int page = 0;
     private ButtonWidget prevButton;
     private ButtonWidget nextButton;
+    private boolean exported = false;
 
     private final List<int[]> rowBounds = new ArrayList<>();
     private final List<SwapHistory.SwapRecord> visibleRows = new ArrayList<>();
@@ -32,46 +41,117 @@ public class SwapHistoryScreen extends Screen {
 
     @Override
     protected void init() {
-        addDrawableChild(ButtonWidget.builder(Text.literal(spearSlotLabel()), b -> {
-            SwapConfig.spearSlot = SwapConfig.nextSlot(SwapConfig.spearSlot);
-            b.setMessage(Text.literal(spearSlotLabel()));
-        }).dimensions(this.width / 2 - 150, 36, 98, 16).build());
-
-        addDrawableChild(ButtonWidget.builder(Text.literal(partnerSlotLabel()), b -> {
-            SwapConfig.partnerSlot = SwapConfig.nextSlot(SwapConfig.partnerSlot);
-            b.setMessage(Text.literal(partnerSlotLabel()));
-        }).dimensions(this.width / 2 - 49, 36, 98, 16).build());
-
-        addDrawableChild(ButtonWidget.builder(Text.literal(seriesGapLabel()), b -> {
-            SwapConfig.seriesGapMs = SwapConfig.nextSeriesGap(SwapConfig.seriesGapMs);
-            b.setMessage(Text.literal(seriesGapLabel()));
-        }).dimensions(this.width / 2 + 52, 36, 98, 16).build());
+        int tabX = this.width / 2 - 117;
+        addDrawableChild(ButtonWidget.builder(Text.literal("История"), b -> switchTab(TAB_HISTORY))
+                .dimensions(tabX, 6, 78, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Статистика"), b -> switchTab(TAB_STATS))
+                .dimensions(tabX + 78, 6, 78, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Настройки"), b -> switchTab(TAB_SETTINGS))
+                .dimensions(tabX + 156, 6, 78, 18).build());
 
         int y = this.height - 26;
-
-        this.prevButton = addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
-            if (this.page > 0) {
-                this.page--;
-            }
-        }).dimensions(this.width / 2 - 200, y, 60, 20).build());
-
-        this.nextButton = addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
-            this.page++;
-        }).dimensions(this.width / 2 - 130, y, 60, 20).build());
-
-        addDrawableChild(ButtonWidget.builder(Text.literal("Очистить"), b -> {
-            SwapHistory.clear();
-            this.page = 0;
-        }).dimensions(this.width / 2 - 60, y, 120, 20).build());
-
         addDrawableChild(ButtonWidget.builder(Text.literal("Закрыть"), b -> this.close())
                 .dimensions(this.width / 2 + 70, y, 120, 20).build());
+
+        if (this.tab == TAB_HISTORY) {
+            this.prevButton = addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
+                if (this.page > 0) {
+                    this.page--;
+                }
+            }).dimensions(this.width / 2 - 200, y, 60, 20).build());
+
+            this.nextButton = addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
+                this.page++;
+            }).dimensions(this.width / 2 - 130, y, 60, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal("Очистить"), b -> {
+                SwapHistory.clear();
+                this.page = 0;
+            }).dimensions(this.width / 2 - 60, y, 120, 20).build());
+        } else if (this.tab == TAB_STATS) {
+            addDrawableChild(ButtonWidget.builder(Text.literal(metricLabel()), b -> {
+                SwapConfig.nextMetricIndex();
+                SwapConfig.save();
+                b.setMessage(Text.literal(metricLabel()));
+            }).dimensions(this.width / 2 - 200, y, 190, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal("Экспорт статистики"), b -> {
+                StatsExporter.exportSession();
+                StatsExporter.mergeAllTime();
+                this.exported = true;
+                b.setMessage(Text.literal("Экспортировано ✓"));
+            }).dimensions(this.width / 2 + 10, y, 190, 20).build());
+        } else {
+            addDrawableChild(ButtonWidget.builder(Text.literal(spearSlotLabel()), b -> {
+                SwapConfig.spearSlot = SwapConfig.nextSlot(SwapConfig.spearSlot);
+                SwapConfig.save();
+                b.setMessage(Text.literal(spearSlotLabel()));
+            }).dimensions(this.width / 2 - 150, this.height - 52, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal(partnerSlotLabel()), b -> {
+                SwapConfig.partnerSlot = SwapConfig.nextSlot(SwapConfig.partnerSlot);
+                SwapConfig.save();
+                b.setMessage(Text.literal(partnerSlotLabel()));
+            }).dimensions(this.width / 2 + 5, this.height - 52, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal(seriesGapLabel()), b -> {
+                SwapConfig.seriesGapMs = SwapConfig.nextSeriesGap(SwapConfig.seriesGapMs);
+                SwapConfig.save();
+                b.setMessage(Text.literal(seriesGapLabel()));
+            }).dimensions(this.width / 2 - 150, this.height - 78, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal(SwapConfig.hudProfileLabel()), b -> {
+                SwapConfig.nextHudProfile();
+                SwapConfig.save();
+                b.setMessage(Text.literal(SwapConfig.hudProfileLabel()));
+            }).dimensions(this.width / 2 + 5, this.height - 78, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal(soundLabel()), b -> {
+                SwapConfig.soundEnabled = !SwapConfig.soundEnabled;
+                SwapConfig.save();
+                b.setMessage(Text.literal(soundLabel()));
+            }).dimensions(this.width / 2 - 150, this.height - 104, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal(volumeLabel()), b -> {
+                SwapConfig.nextVolumeIndex();
+                SwapConfig.save();
+                b.setMessage(Text.literal(volumeLabel()));
+            }).dimensions(this.width / 2 + 5, this.height - 104, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal(goalLabel()), b -> {
+                SwapConfig.nextGoalIndex();
+                SwapConfig.save();
+                b.setMessage(Text.literal(goalLabel()));
+            }).dimensions(this.width / 2 - 150, this.height - 130, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal("Сброс цели"), b -> {
+                SwapConfig.goalProgress = 0;
+                SwapConfig.goalCompleted = false;
+                SwapConfig.save();
+            }).dimensions(this.width / 2 + 5, this.height - 130, 145, 20).build());
+        }
+    }
+
+    private void switchTab(int newTab) {
+        this.tab = newTab;
+        this.clearChildren();
+        this.init();
     }
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
 
+        if (this.tab == TAB_HISTORY) {
+            renderHistoryTab(context, mouseX, mouseY);
+        } else if (this.tab == TAB_STATS) {
+            renderStatsTab(context);
+        } else {
+            renderSettingsTab(context);
+        }
+    }
+
+    private void renderHistoryTab(DrawContext context, int mouseX, int mouseY) {
         List<SwapHistory.SwapRecord> records = SwapHistory.snapshot();
         int total = records.size();
         int pages = pageCount(total);
@@ -85,9 +165,12 @@ public class SwapHistoryScreen extends Screen {
         this.prevButton.active = this.page > 0;
         this.nextButton.active = this.page < pages - 1;
 
-        String meta = "Страница " + (this.page + 1) + "/" + pages + " | свапов: " + total;
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 10, 0xFFFFFF);
-        context.drawCenteredTextWithShadow(this.textRenderer, meta, this.width / 2, 24, 0xAAAAAA);
+        String meta = "Страница " + (this.page + 1) + "/" + pages
+                + " | свапов: " + total
+                + " | рывков: " + SwapHistory.getLungeCount()
+                + " | дальность: " + SwapHistory.getReachCount()
+                + " | серия: " + SwapHistory.getBestSeries();
+        context.drawCenteredTextWithShadow(this.textRenderer, meta, this.width / 2, 28, 0xAAAAAA);
 
         this.rowBounds.clear();
         this.visibleRows.clear();
@@ -103,7 +186,7 @@ public class SwapHistoryScreen extends Screen {
         int end = Math.min(total - this.page * ROWS_PER_PAGE, total);
 
         int x = this.width / 2 - 100;
-        int y = 58;
+        int y = 42;
 
         for (int i = end - 1; i >= start; i--) {
             SwapHistory.SwapRecord r = records.get(i);
@@ -117,6 +200,116 @@ public class SwapHistoryScreen extends Screen {
         if (hovered != null) {
             context.drawTooltip(this.textRenderer, buildTooltip(hovered), mouseX, mouseY);
         }
+    }
+
+    private void renderStatsTab(DrawContext context) {
+        int x = this.width / 2 - 130;
+        int y = 40;
+
+        context.drawCenteredTextWithShadow(this.textRenderer,
+                Text.literal("Статистика"), this.width / 2, 28, 0xFFFFFF);
+
+        long lunges = SwapHistory.getLungeCount();
+        long effective = SwapHistory.getEffectiveLungeCount();
+        long reach = SwapHistory.getReachCount();
+
+        context.drawTextWithShadow(this.textRenderer,
+                "Рывков: " + lunges, x, y, 0xFFFFFF);
+        context.drawTextWithShadow(this.textRenderer,
+                "Свапов ради дальности: " + reach, x + 140, y, 0xFF7FDF7F);
+        y += 12;
+        context.drawTextWithShadow(this.textRenderer,
+                "Эффективных КД-скипов: " + SwapHistory.formatPercent(effective, lunges),
+                x, y, effective == lunges && lunges > 0 ? 0xFF45FF45 : 0xFFFF5555);
+        y += 12;
+        context.drawTextWithShadow(this.textRenderer,
+                "Лучшая серия: " + SwapHistory.getBestSeries(), x, y, 0xFFFFFF);
+        y += 16;
+
+        String metricName = SwapConfig.metricIndex == 0 ? "Avg Δ" : "Median Δ";
+        long metricValue = SwapConfig.metricIndex == 0
+                ? SwapHistory.getAvgLungeInterval() : SwapHistory.getMedianLungeInterval();
+        context.drawTextWithShadow(this.textRenderer,
+                metricName + " (сессия): " + SwapHistory.formatDuration(metricValue),
+                x, y, 0xFFFFFF);
+        y += 12;
+        context.drawTextWithShadow(this.textRenderer,
+                "Лучший Δ (сессия): " + SwapHistory.formatDuration(SwapHistory.getBestSessionLungeDelta()),
+                x, y, 0xFFFFD455);
+        y += 12;
+
+        java.util.Map<String, Long> allTime = StatsExporter.readAllTime();
+        long allLunges = allTime.containsKey("lunges") ? allTime.get("lunges") : 0L;
+        long allSum = allTime.containsKey("avgSumMs") ? allTime.get("avgSumMs") : 0L;
+        long allCount = allTime.containsKey("avgCount") ? allTime.get("avgCount") : 0L;
+        long allBest = allTime.containsKey("bestDeltaMs") ? allTime.get("bestDeltaMs") : -1L;
+        context.drawTextWithShadow(this.textRenderer,
+                "Всё время: рывков " + allLunges + ", avg Δ "
+                        + (allCount > 0 ? (allSum / allCount) + " мс" : "--")
+                        + ", лучший " + (allBest >= 0 ? allBest + " мс" : "--"),
+                x, y, 0xAAAAAA);
+        y += 16;
+
+        context.drawTextWithShadow(this.textRenderer, "Эталоны:", x, y, 0xFFFFFF);
+        y += 12;
+        context.drawTextWithShadow(this.textRenderer,
+                "· Идеальный 1-тик: " + SwapConfig.BENCHMARK_ONE_TICK_MS + " мс",
+                x, y, 0xFF45FF45);
+        y += 11;
+        context.drawTextWithShadow(this.textRenderer,
+                "· Стабильный PvP: " + SwapConfig.BENCHMARK_STABLE_PVP_MS + " мс",
+                x, y, 0xFFFFFF55);
+        y += 17;
+
+        context.drawTextWithShadow(this.textRenderer, "Аим (рывки):", x, y, 0xFFFFFF);
+        y += 12;
+
+        long[] aims = SwapHistory.getAimCounts();
+        long aimTotal = aims[0] + aims[1] + aims[2] + aims[3];
+        int barWidth = 260;
+        int barHeight = 10;
+        int barX = x;
+        context.fill(barX - 1, y - 1, barX + barWidth + 1, y + barHeight + 1, 0xFFFFFFFF);
+        if (aimTotal == 0) {
+            context.fill(barX, y, barX + barWidth, y + barHeight, 0xFF303030);
+        } else {
+            int offset = 0;
+            for (int i = 0; i < aims.length; i++) {
+                int segment = (int) Math.round(barWidth * aims[i] / (double) aimTotal);
+                if (i == aims.length - 1) {
+                    segment = barWidth - offset;
+                }
+                if (segment > 0) {
+                    context.fill(barX + offset, y, barX + offset + segment, y + barHeight, AIM_COLORS[i]);
+                }
+                offset += segment;
+            }
+        }
+        y += barHeight + 4;
+        context.drawTextWithShadow(this.textRenderer, legend(aims, aimTotal), x, y, 0xAAAAAA);
+        y += 16;
+
+        if (this.exported) {
+            context.drawTextWithShadow(this.textRenderer,
+                    "Сохранено: config/orlpvpmogg/stats.txt и alltime.txt",
+                    x, y, 0xFF45FF45);
+        }
+
+        SwapConfig.Goal goal = SwapConfig.currentGoal();
+        if (goal != null) {
+            String goalLine = SwapConfig.goalCompleted
+                    ? "Цель выполнена: " + goal.name()
+                    : "Цель: " + SwapConfig.goalProgress + "/" + goal.count() + " — " + goal.name();
+            context.drawCenteredTextWithShadow(this.textRenderer,
+                    Text.literal(goalLine).formatted(Formatting.GRAY),
+                    this.width / 2, this.height - 40, 0xFFFFFFFF);
+        }
+    }
+
+    private void renderSettingsTab(DrawContext context) {
+        context.drawCenteredTextWithShadow(this.textRenderer,
+                "Все настройки сохраняются в config/orlpvpmogg.json",
+                this.width / 2, 30, 0xAAAAAA);
     }
 
     private void renderRow(DrawContext context, SwapHistory.SwapRecord r, int x, int y) {
@@ -175,15 +368,28 @@ public class SwapHistoryScreen extends Screen {
         lines.add(lost.formatted(Formatting.GRAY));
 
         if (r.lungeSwap()) {
-            lines.add(r.fromOnCooldown()
-                    ? Text.literal("Свап на копьё (рывок): КД снятого предмета есть — неэффективно").formatted(Formatting.RED)
-                    : Text.literal("Свап на копьё (рывок): КД снятого предмета нет — эффективный скип КД").formatted(Formatting.GREEN));
-            lines.add(Text.literal("Удар ЛКМ был за " + SwapHistory.formatDuration(r.attackGapMs()) + " до свапа")
-                    .formatted(Formatting.GRAY));
+            if (r.fromOnCooldown()) {
+                lines.add(Text.literal("Рывок: КД снятого предмета есть — неэффективно").formatted(Formatting.RED));
+                if (r.attackGapMs() >= 0 && r.attackGapMs() > 150) {
+                    lines.add(Text.literal("Причина: слишком поздний переход — удар был за "
+                            + r.attackGapMs() + " мс до свапа").formatted(Formatting.GRAY));
+                } else {
+                    lines.add(Text.literal("Причина: слишком рано — снятый предмет ещё на КД").formatted(Formatting.GRAY));
+                }
+            } else {
+                lines.add(Text.literal("Рывок: эффективный КД-скип").formatted(Formatting.GREEN));
+            }
+            long best = SwapHistory.getBestForPair(r.from(), r.to());
+            if (best >= 0 && r.intervalMs() >= 0) {
+                lines.add(Text.literal("Рекорд пары: " + best + " мс")
+                        .formatted(Formatting.DARK_GRAY));
+            }
+            lines.add(Text.literal("Удар ЛКМ был за " + SwapHistory.formatDuration(r.attackGapMs())
+                    + " до свапа, аим " + String.format("%.1f", r.pitchDeg()) + "°").formatted(Formatting.GRAY));
         } else if (r.reachSwap()) {
             lines.add(Text.literal("Свап с копья — ради дальности, удар одновременно (не рывок)").formatted(Formatting.GRAY));
-            lines.add(Text.literal("Удар ЛКМ был за " + SwapHistory.formatDuration(r.attackGapMs()) + " до свапа")
-                    .formatted(Formatting.GRAY));
+            lines.add(Text.literal("Удар ЛКМ был за " + SwapHistory.formatDuration(r.attackGapMs())
+                    + " до свапа").formatted(Formatting.GRAY));
         } else {
             lines.add(Text.literal("Простая смена слота без удара — не рывок и не дальность").formatted(Formatting.DARK_GRAY));
         }
@@ -205,12 +411,47 @@ public class SwapHistoryScreen extends Screen {
         return result;
     }
 
+    private String legend(long[] aims, long total) {
+        if (total == 0) {
+            return "нет рывков";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < aims.length; i++) {
+            if (i > 0) {
+                sb.append(" · ");
+            }
+            sb.append(AIM_NAMES[i]).append(" ").append(SwapHistory.formatPercent(aims[i], total));
+        }
+        return sb.toString();
+    }
+
+    private String metricLabel() {
+        return SwapConfig.metricIndex == 0 ? "Метрика: Avg Δ" : "Метрика: Median Δ";
+    }
+
+    private String soundLabel() {
+        return "Звук: " + (SwapConfig.soundEnabled ? "вкл" : "выкл");
+    }
+
+    private String volumeLabel() {
+        return "Громкость: " + SwapConfig.VOLUME_CHOICES[
+                Math.max(0, Math.min(SwapConfig.volumeIndex, SwapConfig.VOLUME_CHOICES.length - 1))] + "%";
+    }
+
+    private String goalLabel() {
+        return SwapConfig.goalIndex >= 0 && SwapConfig.goalIndex < SwapConfig.GOALS.length
+                ? SwapConfig.GOALS[SwapConfig.goalIndex].name()
+                : "Цель: ВЫКЛ";
+    }
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (verticalAmount < 0) {
-            this.page++;
-        } else if (verticalAmount > 0) {
-            this.page--;
+        if (this.tab == TAB_HISTORY) {
+            if (verticalAmount < 0) {
+                this.page++;
+            } else if (verticalAmount > 0) {
+                this.page--;
+            }
         }
         return true;
     }

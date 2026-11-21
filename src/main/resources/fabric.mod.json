@@ -12,6 +12,9 @@
   "entrypoints": {
     "client": [
       "org.example.ronin.OrlPvpClient"
+    ],
+    "modmenu": [
+      "org.example.ronin.ModMenuIntegration"
     ]
   },
   "depends": {

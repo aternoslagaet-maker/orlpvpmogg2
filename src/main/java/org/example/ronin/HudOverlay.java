@@ -34,6 +34,7 @@ public final class HudOverlay {
         }
 
         SwapHistory.SwapRecord r = last.get();
+        boolean fullProfile = SwapConfig.hudProfile != 0;
 
         String delta = "Δ " + SwapHistory.formatDuration(r.intervalMs());
 
@@ -46,6 +47,33 @@ public final class HudOverlay {
         }
         String cooldown = lastLunge.map(SwapHistory.SwapRecord::fromOnCooldown).orElse(false) ? "КД!" : "";
 
+        String recordText = "";
+        int recordColor = COLOR_GRAY;
+        if (fullProfile && lastLunge.isPresent() && lastLunge.get().recordDiffMs() != SwapHistory.NO_PREV_RECORD
+                && lastLunge.get().intervalMs() >= 0) {
+            if (lastLunge.get().recordDiffMs() <= 0) {
+                recordText = "Δ: " + SwapHistory.formatDuration(lastLunge.get().intervalMs())
+                        + " (РЕКОРД " + lastLunge.get().recordDiffMs() + "мс)";
+                recordColor = 0xFFFFD455;
+            } else {
+                recordText = "+" + lastLunge.get().recordDiffMs() + "мс к рекорду";
+                recordColor = COLOR_GRAY;
+            }
+        }
+
+        String goalText = "";
+        int goalColor = COLOR_GRAY;
+        if (fullProfile) {
+            SwapConfig.Goal goal = SwapConfig.currentGoal();
+            if (SwapConfig.goalCompleted) {
+                goalText = "✓ " + goal.name();
+                goalColor = COLOR_SPEAR;
+            } else if (goal != null) {
+                goalText = "Цель: " + SwapConfig.goalProgress + "/" + goal.count();
+                goalColor = SwapConfig.goalProgress > 0 ? COLOR_TEXT : COLOR_GRAY;
+            }
+        }
+
         int pad = 3;
         int iconSize = 16;
         int textX = pad + iconSize + pad + 6 + iconSize + pad + 2;
@@ -54,25 +82,33 @@ public final class HudOverlay {
         float pitch = client.player.getPitch(0.0f);
         String pitchValue = String.format("%.1f°", pitch);
         int pitchColor = pitchColor(pitch);
-        boolean showPitch = lastLunge.isPresent();
+        boolean showPitch = fullProfile && lastLunge.isPresent();
 
         int width = textX + client.textRenderer.getWidth(delta) + pad;
-        if (!spearDelta.isEmpty()) {
-            int line2 = client.textRenderer.getWidth(spearDelta)
-                    + (cooldown.isEmpty() ? 0 : client.textRenderer.getWidth(cooldown) + 3) + pad;
-            width = Math.max(width, textX + line2);
+        int line2Width = 0;
+        if (fullProfile && !spearDelta.isEmpty()) {
+            line2Width = client.textRenderer.getWidth(spearDelta)
+                    + (cooldown.isEmpty() ? 0 : client.textRenderer.getWidth(cooldown) + 3);
+            width = Math.max(width, textX + line2Width + pad);
         }
         if (showPitch) {
             int line3 = client.textRenderer.getWidth(pitchLabel)
-                    + client.textRenderer.getWidth(pitchValue) + pad;
-            width = Math.max(width, textX + line3);
+                    + client.textRenderer.getWidth(pitchValue);
+            width = Math.max(width, textX + line3 + pad);
+        }
+        if (!recordText.isEmpty()) {
+            width = Math.max(width, textX + client.textRenderer.getWidth(recordText) + pad);
+        }
+        if (!goalText.isEmpty()) {
+            width = Math.max(width, textX + client.textRenderer.getWidth(goalText) + pad);
         }
 
         int row1Y = pad + 1;
         int row2Y = pad + 12;
         int row3Y = pad + 23;
-        int height = showPitch ? row3Y + 9 + pad
-                : (spearDelta.isEmpty() ? row1Y + 9 + pad : row2Y + 9 + pad);
+
+        int rows = fullProfile ? countRows(spearDelta, showPitch, recordText, goalText) : 1;
+        int height = row1Y + rows * 11 + pad;
 
         context.fill(0, 0, width, height, COLOR_BACKGROUND);
 
@@ -82,19 +118,47 @@ public final class HudOverlay {
 
         context.drawTextWithShadow(client.textRenderer, delta, textX, row1Y, COLOR_TEXT);
 
-        if (!spearDelta.isEmpty()) {
-            context.drawTextWithShadow(client.textRenderer, spearDelta, textX, row2Y, COLOR_SPEAR);
-            if (!cooldown.isEmpty()) {
-                context.drawTextWithShadow(client.textRenderer, cooldown,
-                        textX + client.textRenderer.getWidth(spearDelta) + 3, row2Y, COLOR_BAD);
+        if (fullProfile) {
+            int line = row2Y;
+            if (!spearDelta.isEmpty()) {
+                context.drawTextWithShadow(client.textRenderer, spearDelta, textX, line, COLOR_SPEAR);
+                if (!cooldown.isEmpty()) {
+                    context.drawTextWithShadow(client.textRenderer, cooldown,
+                            textX + client.textRenderer.getWidth(spearDelta) + 3, line, COLOR_BAD);
+                }
+                line += 11;
+            }
+            if (!recordText.isEmpty()) {
+                context.drawTextWithShadow(client.textRenderer, recordText, textX, line, recordColor);
+                line += 11;
+            }
+            if (showPitch) {
+                int valueX = textX + client.textRenderer.getWidth(pitchLabel);
+                context.drawTextWithShadow(client.textRenderer, pitchLabel, textX, line, COLOR_GRAY);
+                context.drawTextWithShadow(client.textRenderer, pitchValue, valueX, line, pitchColor);
+                line += 11;
+            }
+            if (!goalText.isEmpty()) {
+                context.drawTextWithShadow(client.textRenderer, goalText, textX, line, goalColor);
             }
         }
+    }
 
-        if (showPitch) {
-            int valueX = textX + client.textRenderer.getWidth(pitchLabel);
-            context.drawTextWithShadow(client.textRenderer, pitchLabel, textX, row3Y, COLOR_GRAY);
-            context.drawTextWithShadow(client.textRenderer, pitchValue, valueX, row3Y, pitchColor);
+    private static int countRows(boolean spearDelta, boolean showPitch, String recordText, String goalText) {
+        int rows = 1;
+        if (!spearDelta.isEmpty()) {
+            rows++;
         }
+        if (!recordText.isEmpty()) {
+            rows++;
+        }
+        if (showPitch) {
+            rows++;
+        }
+        if (!goalText.isEmpty()) {
+            rows++;
+        }
+        return rows;
     }
 
     private static int pitchColor(float pitch) {
