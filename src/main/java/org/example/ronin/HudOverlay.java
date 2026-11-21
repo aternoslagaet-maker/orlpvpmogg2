@@ -10,6 +10,7 @@ public final class HudOverlay {
 
     private static final int COLOR_TEXT = 0xFFFFFFFF;
     private static final int COLOR_SPEAR = 0xFF45FF45;
+    private static final int COLOR_BAD = 0xFFFF5555;
     private static final int COLOR_BACKGROUND = 0x64000000;
 
     private HudOverlay() {
@@ -29,15 +30,19 @@ public final class HudOverlay {
         SwapHistory.SwapRecord r = last.get();
 
         String delta = "Δ " + SwapHistory.formatDuration(r.intervalMs());
-        String spearDelta = SwapHistory.getLastSpearInterval() >= 0
-                ? "Δ копьё " + SwapHistory.formatDuration(SwapHistory.getLastSpearInterval())
-                : "";
+        String spearDelta = "";
+        if (r.lungeSpearInvolved() && SwapHistory.getLastSpearInterval() >= 0) {
+            spearDelta = "Δ копьё " + SwapHistory.formatDuration(SwapHistory.getLastSpearInterval())
+                    + " · серия " + r.lungeSeries();
+        }
+        String cooldown = r.lungeSpearInvolved() && r.fromOnCooldown() ? "КД!" : "";
 
         int iconSize = 16;
         int pad = 3;
         int textX = pad + iconSize + pad + 6 + iconSize + pad + 2;
-        int width = textX + Math.max(client.textRenderer.getWidth(delta),
-                spearDelta.isEmpty() ? 0 : client.textRenderer.getWidth(spearDelta)) + pad;
+        int spearWidth = spearDelta.isEmpty() ? 0 : client.textRenderer.getWidth(spearDelta);
+        int width = textX + Math.max(client.textRenderer.getWidth(delta), spearWidth)
+                + (cooldown.isEmpty() ? 0 : client.textRenderer.getWidth(cooldown) + 3) + pad;
         int height = pad + iconSize + pad + 11 + pad;
 
         context.fill(0, 0, width, height, COLOR_BACKGROUND);
@@ -47,8 +52,13 @@ public final class HudOverlay {
         drawStack(context, r.to(), pad + iconSize + pad + 4, pad);
 
         context.drawTextWithShadow(client.textRenderer, delta, textX, pad + 1, COLOR_TEXT);
+        int secondX = textX;
         if (!spearDelta.isEmpty()) {
             context.drawTextWithShadow(client.textRenderer, spearDelta, textX, pad + iconSize - 1, COLOR_SPEAR);
+            secondX = textX + spearWidth + 3;
+        }
+        if (!cooldown.isEmpty()) {
+            context.drawTextWithShadow(client.textRenderer, cooldown, secondX, pad + iconSize - 1, COLOR_BAD);
         }
     }
 

@@ -5,23 +5,26 @@ import net.minecraft.component.type.AttributeModifiersComponent;
 import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.minecraft.item.ItemStack;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public final class SwapHistory {
 
     public static final int MAX_RECORDS = 500;
+    public static final long SERIES_GAP_MS = 3000L;
 
     private static final ArrayDeque<SwapRecord> RECORDS = new ArrayDeque<>();
-    private static long lastSpearSwapMs = -1L;
 
     private SwapHistory() {
     }
@@ -31,22 +34,33 @@ public final class SwapHistory {
             ItemStack from,
             ItemStack to,
             long intervalMs,
-            boolean spearInvolved
+            boolean spearInvolved,
+            boolean lungeSpearInvolved,
+            boolean fromOnCooldown,
+            int lungeSeries
     ) {
     }
 
-    public static synchronized void record(ItemStack from, ItemStack to) {
+    public static synchronized void record(ItemStack from, ItemStack to, boolean fromOnCooldown) {
         boolean spearInvolved = isSpear(from) || isSpear(to);
+        boolean lungeSpearInvolved = isLungeSpear(from) || isLungeSpear(to);
         long now = System.currentTimeMillis();
 
         List<SwapRecord> all = snapshot();
         long intervalMs = all.isEmpty() ? -1L : now - all.get(all.size() - 1).timeMs();
 
-        if (spearInvolved) {
-            lastSpearSwapMs = now;
+        int series = 0;
+        if (lungeSpearInvolved) {
+            SwapRecord prev = all.isEmpty() ? null : all.get(all.size() - 1);
+            if (prev != null && prev.lungeSpearInvolved() && intervalMs >= 0 && intervalMs <= SERIES_GAP_MS) {
+                series = prev.lungeSeries() + 1;
+            } else {
+                series = 1;
+            }
         }
 
-        RECORDS.addLast(new SwapRecord(now, from.copy(), to.copy(), intervalMs, spearInvolved));
+        RECORDS.addLast(new SwapRecord(now, from.copy(), to.copy(), intervalMs,
+                spearInvolved, lungeSpearInvolved, fromOnCooldown, series));
         while (RECORDS.size() > MAX_RECORDS) {
             RECORDS.removeFirst();
         }
@@ -58,45 +72,22 @@ public final class SwapHistory {
 
     public static synchronized void clear() {
         RECORDS.clear();
-        lastSpearSwapMs = -1L;
     }
 
     public static synchronized long getCount() {
         return RECORDS.size();
     }
 
-    public static synchronized long getSpearCount() {
-        return RECORDS.stream().filter(SwapRecord::spearInvolved).count();
-    }
-
     public static synchronized Optional<SwapRecord> last() {
         return RECORDS.isEmpty() ? Optional.empty() : Optional.of(RECORDS.getLast());
-    }
-
-    public static synchronized long getLastInterval() {
-        List<SwapRecord> all = snapshot();
-        return all.isEmpty() ? -1L : all.get(all.size() - 1).intervalMs();
-    }
-
-    public static synchronized double getAverageInterval() {
-        List<SwapRecord> all = snapshot();
-        long sum = 0L;
-        long n = 0L;
-        for (SwapRecord r : all) {
-            if (r.intervalMs() > 0L) {
-                sum += r.intervalMs();
-                n++;
-            }
-        }
-        return n == 0L ? -1.0 : (double) sum / (double) n;
     }
 
     public static synchronized long getLastSpearInterval() {
         List<SwapRecord> all = snapshot();
         for (int j = all.size() - 1; j >= 0; j--) {
-            if (all.get(j).spearInvolved()) {
+            if (all.get(j).lungeSpearInvolved()) {
                 for (int k = j - 1; k >= 0; k--) {
-                    if (all.get(k).spearInvolved()) {
+                    if (all.get(k).lungeSpearInvolved()) {
                         return all.get(j).timeMs() - all.get(k).timeMs();
                     }
                 }
@@ -115,6 +106,9 @@ public final class SwapHistory {
     }
 
     public static boolean isWeapon(ItemStack stack) {
+        if (isSpear(stack)) {
+            return true;
+        }
         if (stack.isEmpty()) {
             return false;
         }
@@ -138,20 +132,65 @@ public final class SwapHistory {
         return id != null && (id.getPath().contains("spear") || id.getPath().contains("trident"));
     }
 
-    public static List<Text> enchantmentsOf(ItemStack stack) {
+    public static boolean isLungeSpear(ItemStack stack) {
+        return isSpear(stack) && hasLunge(stack);
+    }
+
+    private static boolean hasLunge(ItemStack stack) {
+        ItemEnchantmentsComponent component = stack.get(DataComponentTypes.ENCHANTMENTS);
+        if (component == null) {
+            return false;
+        }
+        for (RegistryEntry<Enchantment> entry : component.getEnchantments()) {
+            Identifier id = entry.getKey().map(RegistryKey::getValue).orElse(null);
+            if (id != null && "lunge".equals(id.getPath())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Set<String> enchantKeys(ItemStack stack) {
+        Set<String> keys = new HashSet<>();
+        ItemEnchantmentsComponent component = stack.get(DataComponentTypes.ENCHANTMENTS);
+        if (component == null) {
+            return keys;
+        }
+        for (RegistryEntry<Enchantment> entry : component.getEnchantments()) {
+            Identifier id = entry.getKey().map(RegistryKey::getValue).orElse(null);
+            if (id == null || "lunge".equals(id.getPath()) || "mending".equals(id.getPath())) {
+                continue;
+            }
+            keys.add(id + "#" + component.getLevel(entry));
+        }
+        return keys;
+    }
+
+    public static List<Text> addedEnchantments(ItemStack from, ItemStack to) {
+        return diffEnchantments(to, from);
+    }
+
+    public static List<Text> removedEnchantments(ItemStack from, ItemStack to) {
+        return diffEnchantments(from, to);
+    }
+
+    private static List<Text> diffEnchantments(ItemStack stack, ItemStack other) {
+        Set<String> otherKeys = enchantKeys(other);
         List<Text> result = new ArrayList<>();
         ItemEnchantmentsComponent component = stack.get(DataComponentTypes.ENCHANTMENTS);
         if (component == null) {
             return result;
         }
         for (RegistryEntry<Enchantment> entry : component.getEnchantments()) {
-            Identifier id = entry.getKey().map(key -> key.getValue()).orElse(null);
-            if (id == null || "lunge".equals(id.getPath())) {
+            Identifier id = entry.getKey().map(RegistryKey::getValue).orElse(null);
+            if (id == null || "lunge".equals(id.getPath()) || "mending".equals(id.getPath())) {
                 continue;
             }
             int level = component.getLevel(entry);
-            result.add(Text.translatable("enchantment." + id.getNamespace() + "." + id.getPath())
-                    .append(" " + toRoman(level)));
+            if (!otherKeys.contains(id + "#" + level)) {
+                result.add(Text.translatable("enchantment." + id.getNamespace() + "." + id.getPath())
+                        .append(" " + toRoman(level)));
+            }
         }
         return result;
     }

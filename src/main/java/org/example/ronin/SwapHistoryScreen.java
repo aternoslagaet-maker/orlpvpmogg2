@@ -105,7 +105,7 @@ public class SwapHistoryScreen extends Screen {
     }
 
     private void renderRow(DrawContext context, SwapHistory.SwapRecord r, int x, int y) {
-        context.fill(x - 6, y, x + 206, y + ROW_HEIGHT, r.spearInvolved() ? 0x30144014 : 0x30000000);
+        context.fill(x - 6, y, x + 206, y + ROW_HEIGHT, r.lungeSpearInvolved() ? 0x30144014 : 0x30000000);
 
         drawStack(context, r.from(), x, y + 3);
         context.drawTextWithShadow(this.textRenderer, "→", x + 19, y + 8, 0xFFFFFF);
@@ -117,8 +117,12 @@ public class SwapHistoryScreen extends Screen {
         String interval = r.intervalMs() > 0 ? "Δ " + SwapHistory.formatDuration(r.intervalMs()) : "Δ --";
         context.drawTextWithShadow(this.textRenderer, interval, x + 56, y + 13, 0xFFFFFF);
 
-        if (r.spearInvolved()) {
-            context.drawTextWithShadow(this.textRenderer, "⚑ копьё", x + 130, y + 8, 0xFF45FF45);
+        if (r.lungeSpearInvolved()) {
+            context.drawTextWithShadow(this.textRenderer, "⚑ копьё", x + 122, y + 3, 0xFF45FF45);
+            if (r.fromOnCooldown()) {
+                context.drawTextWithShadow(this.textRenderer, "КД", x + 186, y + 3, 0xFFFF5555);
+            }
+            context.drawTextWithShadow(this.textRenderer, "серия " + r.lungeSeries(), x + 122, y + 13, 0xFFFFFF);
         }
     }
 
@@ -144,13 +148,19 @@ public class SwapHistoryScreen extends Screen {
         List<Text> lines = new ArrayList<>();
         lines.add(r.from().getName().copy().append(Text.literal(" → ")).append(r.to().getName()));
 
-        MutableText removed = Text.literal("Снял: ");
-        removed.append(joinEnchantments(SwapHistory.enchantmentsOf(r.from())));
-        lines.add(removed.formatted(Formatting.GRAY));
+        MutableText gained = Text.literal("Появились: ");
+        gained.append(joinEnchantments(SwapHistory.addedEnchantments(r.from(), r.to())));
+        lines.add(gained.formatted(Formatting.GRAY));
 
-        MutableText applied = Text.literal("Надел: ");
-        applied.append(joinEnchantments(SwapHistory.enchantmentsOf(r.to())));
-        lines.add(applied.formatted(Formatting.GRAY));
+        MutableText lost = Text.literal("Пропали: ");
+        lost.append(joinEnchantments(SwapHistory.removedEnchantments(r.from(), r.to())));
+        lines.add(lost.formatted(Formatting.GRAY));
+
+        if (r.lungeSpearInvolved()) {
+            lines.add(r.fromOnCooldown()
+                    ? Text.literal("КД снятого предмета: есть — свап неэффективен").formatted(Formatting.RED)
+                    : Text.literal("КД снятого предмета: нет — как у обычной руки").formatted(Formatting.GREEN));
+        }
 
         return lines;
     }
