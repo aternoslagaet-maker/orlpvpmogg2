@@ -31,6 +31,7 @@ public class SwapHistoryScreen extends Screen {
     private ButtonWidget prevButton;
     private ButtonWidget nextButton;
     private boolean exported = false;
+    private boolean draggingHud = false;
 
     private final List<int[]> rowBounds = new ArrayList<>();
     private final List<SwapHistory.SwapRecord> visibleRows = new ArrayList<>();
@@ -133,6 +134,12 @@ public class SwapHistoryScreen extends Screen {
                 SwapConfig.goalCompleted = false;
                 SwapConfig.save();
             }).dimensions(this.width / 2 + 5, this.height - 130, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal("Вернуть HUD в угол"), b -> {
+                SwapConfig.hudX = 3;
+                SwapConfig.hudY = 3;
+                SwapConfig.save();
+            }).dimensions(this.width / 2 - 150, this.height - 156, 145, 20).build());
         }
     }
 
@@ -313,7 +320,10 @@ public class SwapHistoryScreen extends Screen {
     private void renderSettingsTab(DrawContext context) {
         context.drawCenteredTextWithShadow(this.textRenderer,
                 "Все настройки сохраняются в config/orlpvpmogg.json",
-                this.width / 2, 30, 0xAAAAAA);
+                this.width / 2, 26, 0xAAAAAA);
+        context.drawCenteredTextWithShadow(this.textRenderer,
+                "Зажми ЛКМ на HUD и тяни — позиция сохранится автоматически",
+                this.width / 2, 38, 0xFFFFD455);
     }
 
     private void renderRow(DrawContext context, SwapHistory.SwapRecord r, int x, int y) {
@@ -446,6 +456,39 @@ public class SwapHistoryScreen extends Screen {
         return SwapConfig.goalIndex >= 0 && SwapConfig.goalIndex < SwapConfig.GOALS.length
                 ? SwapConfig.GOALS[SwapConfig.goalIndex].name()
                 : "Цель: ВЫКЛ";
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.tab == TAB_SETTINGS && button == 0 && HudOverlay.LAST_RECT_VALID) {
+            int[] rect = HudOverlay.LAST_RECT;
+            if (mouseX >= rect[0] && mouseX < rect[0] + rect[2]
+                    && mouseY >= rect[1] && mouseY < rect[1] + rect[3]) {
+                this.draggingHud = true;
+                return true;
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        if (this.draggingHud) {
+            SwapConfig.hudX = Math.max(0, SwapConfig.hudX + (int) Math.round(deltaX));
+            SwapConfig.hudY = Math.max(0, SwapConfig.hudY + (int) Math.round(deltaY));
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (this.draggingHud) {
+            this.draggingHud = false;
+            SwapConfig.save();
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override

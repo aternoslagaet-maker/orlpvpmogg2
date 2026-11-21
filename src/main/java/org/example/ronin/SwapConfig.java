@@ -40,6 +40,8 @@ public final class SwapConfig {
     public static int goalIndex = 0;
     public static int goalProgress = 0;
     public static boolean goalCompleted = false;
+    public static int hudX = 3;
+    public static int hudY = 3;
 
     private SwapConfig() {
     }
@@ -120,6 +122,8 @@ public final class SwapConfig {
             goalIndex = clamp(obj.has("goalIndex") ? obj.get("goalIndex").getAsInt() : 0, 0, GOALS.length);
             goalProgress = obj.has("goalProgress") ? Math.max(0, obj.get("goalProgress").getAsInt()) : 0;
             goalCompleted = obj.has("goalCompleted") && obj.get("goalCompleted").getAsBoolean();
+            hudX = obj.has("hudX") ? Math.max(0, obj.get("hudX").getAsInt()) : 3;
+            hudY = obj.has("hudY") ? Math.max(0, obj.get("hudY").getAsInt()) : 3;
         } catch (Exception ignored) {
         }
     }
@@ -139,6 +143,8 @@ public final class SwapConfig {
             obj.addProperty("goalIndex", goalIndex);
             obj.addProperty("goalProgress", goalProgress);
             obj.addProperty("goalCompleted", goalCompleted);
+            obj.addProperty("hudX", hudX);
+            obj.addProperty("hudY", hudY);
             Files.writeString(path, new Gson().toJson(obj), StandardCharsets.UTF_8);
         } catch (IOException ignored) {
         }

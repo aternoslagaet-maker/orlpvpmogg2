@@ -14,6 +14,9 @@ public final class HudOverlay {
     private static final int COLOR_BAD = 0xFFFF5555;
     private static final int COLOR_BACKGROUND = 0x64000000;
 
+    public static final int[] LAST_RECT = new int[4];
+    public static boolean LAST_RECT_VALID = false;
+
     private static final float PITCH_MAX_GOOD_DEG = 5.0f;
     private static final float PITCH_WARN_DEG = 15.0f;
     private static final float PITCH_BAD_DEG = 30.0f;
@@ -110,36 +113,46 @@ public final class HudOverlay {
         int rows = fullProfile ? countRows(spearDelta, showPitch, recordText, goalText) : 1;
         int height = row1Y + rows * 11 + pad;
 
-        context.fill(0, 0, width, height, COLOR_BACKGROUND);
+        int scaledWidth = client.getWindow().getScaledWidth();
+        int scaledHeight = client.getWindow().getScaledHeight();
+        int ox = Math.max(0, Math.min(SwapConfig.hudX, Math.max(0, scaledWidth - width)));
+        int oy = Math.max(0, Math.min(SwapConfig.hudY, Math.max(0, scaledHeight - height)));
+        LAST_RECT[0] = ox;
+        LAST_RECT[1] = oy;
+        LAST_RECT[2] = width;
+        LAST_RECT[3] = height;
+        LAST_RECT_VALID = true;
 
-        drawStack(context, r.from(), pad, pad);
-        context.drawTextWithShadow(client.textRenderer, "→", pad + iconSize + 1, pad + 4, COLOR_TEXT);
-        drawStack(context, r.to(), pad + iconSize + pad + 4, pad);
+        context.fill(ox, oy, ox + width, oy + height, COLOR_BACKGROUND);
 
-        context.drawTextWithShadow(client.textRenderer, delta, textX, row1Y, COLOR_TEXT);
+        drawStack(context, r.from(), ox + pad, oy + pad);
+        context.drawTextWithShadow(client.textRenderer, "→", ox + pad + iconSize + 1, oy + pad + 4, COLOR_TEXT);
+        drawStack(context, r.to(), ox + pad + iconSize + pad + 4, oy + pad);
+
+        context.drawTextWithShadow(client.textRenderer, delta, ox + textX, oy + row1Y, COLOR_TEXT);
 
         if (fullProfile) {
             int line = row2Y;
             if (!spearDelta.isEmpty()) {
-                context.drawTextWithShadow(client.textRenderer, spearDelta, textX, line, COLOR_SPEAR);
+                context.drawTextWithShadow(client.textRenderer, spearDelta, ox + textX, oy + line, COLOR_SPEAR);
                 if (!cooldown.isEmpty()) {
                     context.drawTextWithShadow(client.textRenderer, cooldown,
-                            textX + client.textRenderer.getWidth(spearDelta) + 3, line, COLOR_BAD);
+                            ox + textX + client.textRenderer.getWidth(spearDelta) + 3, oy + line, COLOR_BAD);
                 }
                 line += 11;
             }
             if (!recordText.isEmpty()) {
-                context.drawTextWithShadow(client.textRenderer, recordText, textX, line, recordColor);
+                context.drawTextWithShadow(client.textRenderer, recordText, ox + textX, oy + line, recordColor);
                 line += 11;
             }
             if (showPitch) {
-                int valueX = textX + client.textRenderer.getWidth(pitchLabel);
-                context.drawTextWithShadow(client.textRenderer, pitchLabel, textX, line, COLOR_GRAY);
-                context.drawTextWithShadow(client.textRenderer, pitchValue, valueX, line, pitchColor);
+                int valueX = ox + textX + client.textRenderer.getWidth(pitchLabel);
+                context.drawTextWithShadow(client.textRenderer, pitchLabel, ox + textX, oy + line, COLOR_GRAY);
+                context.drawTextWithShadow(client.textRenderer, pitchValue, valueX, oy + line, pitchColor);
                 line += 11;
             }
             if (!goalText.isEmpty()) {
-                context.drawTextWithShadow(client.textRenderer, goalText, textX, line, goalColor);
+                context.drawTextWithShadow(client.textRenderer, goalText, ox + textX, oy + line, goalColor);
             }
         }
     }
