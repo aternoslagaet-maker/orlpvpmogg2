@@ -179,7 +179,7 @@ public final class SwapHistory {
 
     public static synchronized long getBestOverallLungeDelta() {
         long best = NO_PREV_RECORD;
-        for (String value : PAIR_BEST.values()) {
+        for (long value : PAIR_BEST.values()) {
             if (value >= 0 && (best == NO_PREV_RECORD || value < best)) {
                 best = value;
             }

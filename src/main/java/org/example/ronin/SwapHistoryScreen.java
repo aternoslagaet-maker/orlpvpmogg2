@@ -39,6 +39,10 @@ public class SwapHistoryScreen extends Screen {
         super(Text.literal("История свапов"));
     }
 
+    public SwapHistoryScreen(Screen parent) {
+        super(Text.literal("История свапов"));
+    }
+
     @Override
     protected void init() {
         int tabX = this.width / 2 - 117;

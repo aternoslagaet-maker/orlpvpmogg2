@@ -144,7 +144,7 @@ public final class HudOverlay {
         }
     }
 
-    private static int countRows(boolean spearDelta, boolean showPitch, String recordText, String goalText) {
+    private static int countRows(String spearDelta, boolean showPitch, String recordText, String goalText) {
         int rows = 1;
         if (!spearDelta.isEmpty()) {
             rows++;
