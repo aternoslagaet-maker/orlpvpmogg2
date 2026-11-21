@@ -112,6 +112,11 @@ public final class SwapHistory {
         if (stack.isEmpty()) {
             return false;
         }
+        if (stack.get(DataComponentTypes.WEAPON) != null
+                || stack.get(DataComponentTypes.KINETIC_WEAPON) != null
+                || stack.get(DataComponentTypes.PIERCING_WEAPON) != null) {
+            return true;
+        }
         AttributeModifiersComponent component = stack.get(DataComponentTypes.ATTRIBUTE_MODIFIERS);
         if (component == null) {
             return false;
