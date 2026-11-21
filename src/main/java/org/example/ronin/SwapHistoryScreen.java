@@ -115,7 +115,8 @@ public class SwapHistoryScreen extends Screen {
     }
 
     private void renderRow(DrawContext context, SwapHistory.SwapRecord r, int x, int y) {
-        context.fill(x - 6, y, x + 206, y + ROW_HEIGHT, r.lungeSpearInvolved() ? 0x30144014 : 0x30000000);
+        context.fill(x - 6, y, x + 206, y + ROW_HEIGHT,
+                r.lungeSwap() ? 0x30144014 : r.reachSwap() ? 0x30284830 : 0x30000000);
 
         drawStack(context, r.from(), x, y + 3);
         context.drawTextWithShadow(this.textRenderer, "→", x + 19, y + 8, 0xFFFFFF);
@@ -127,12 +128,14 @@ public class SwapHistoryScreen extends Screen {
         String interval = r.intervalMs() > 0 ? "Δ " + SwapHistory.formatDuration(r.intervalMs()) : "Δ --";
         context.drawTextWithShadow(this.textRenderer, interval, x + 56, y + 13, 0xFFFFFF);
 
-        if (r.lungeSpearInvolved()) {
-            context.drawTextWithShadow(this.textRenderer, "⚑ копьё", x + 122, y + 3, 0xFF45FF45);
+        if (r.lungeSwap()) {
+            context.drawTextWithShadow(this.textRenderer, "⚑ рывок", x + 122, y + 3, 0xFF45FF45);
             if (r.fromOnCooldown()) {
                 context.drawTextWithShadow(this.textRenderer, "КД", x + 186, y + 3, 0xFFFF5555);
             }
             context.drawTextWithShadow(this.textRenderer, "серия " + r.lungeSeries(), x + 122, y + 13, 0xFFFFFF);
+        } else if (r.reachSwap()) {
+            context.drawTextWithShadow(this.textRenderer, "дальность", x + 122, y + 3, 0xFF7FDF7F);
         }
     }
 
@@ -166,10 +169,12 @@ public class SwapHistoryScreen extends Screen {
         lost.append(joinEnchantments(SwapHistory.removedEnchantments(r.from(), r.to())));
         lines.add(lost.formatted(Formatting.GRAY));
 
-        if (r.lungeSpearInvolved()) {
+        if (r.lungeSwap()) {
             lines.add(r.fromOnCooldown()
-                    ? Text.literal("КД снятого предмета: есть — свап неэффективен").formatted(Formatting.RED)
-                    : Text.literal("КД снятого предмета: нет — как у обычной руки").formatted(Formatting.GREEN));
+                    ? Text.literal("Свап на копьё (рывок): КД снятого предмета есть — неэффективно").formatted(Formatting.RED)
+                    : Text.literal("Свап на копьё (рывок): КД снятого предмета нет — эффективный скип КД").formatted(Formatting.GREEN));
+        } else if (r.reachSwap()) {
+            lines.add(Text.literal("Свап с копья — ради дальности (не рывок)").formatted(Formatting.GRAY));
         }
 
         return lines;

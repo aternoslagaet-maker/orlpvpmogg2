@@ -35,23 +35,25 @@ public final class SwapHistory {
             ItemStack to,
             long intervalMs,
             boolean spearInvolved,
-            boolean lungeSpearInvolved,
+            boolean lungeSwap,
+            boolean reachSwap,
             boolean fromOnCooldown,
             int lungeSeries
     ) {
     }
 
-    public static synchronized void record(ItemStack from, ItemStack to, boolean fromOnCooldown, boolean lungeSpearInvolved) {
-        boolean spearInvolved = lungeSpearInvolved || isSpear(from) || isSpear(to);
+    public static synchronized void record(ItemStack from, ItemStack to, boolean fromOnCooldown,
+                                           boolean lungeSwap, boolean reachSwap) {
+        boolean spearInvolved = lungeSwap || reachSwap || isSpear(from) || isSpear(to);
         long now = System.currentTimeMillis();
 
         List<SwapRecord> all = snapshot();
         long intervalMs = all.isEmpty() ? -1L : now - all.get(all.size() - 1).timeMs();
 
         int series = 0;
-        if (lungeSpearInvolved) {
+        if (lungeSwap) {
             SwapRecord prev = all.isEmpty() ? null : all.get(all.size() - 1);
-            if (prev != null && prev.lungeSpearInvolved() && intervalMs >= 0 && intervalMs <= SERIES_GAP_MS) {
+            if (prev != null && prev.lungeSwap() && intervalMs >= 0 && intervalMs <= SERIES_GAP_MS) {
                 series = prev.lungeSeries() + 1;
             } else {
                 series = 1;
@@ -59,7 +61,7 @@ public final class SwapHistory {
         }
 
         RECORDS.addLast(new SwapRecord(now, from.copy(), to.copy(), intervalMs,
-                spearInvolved, lungeSpearInvolved, fromOnCooldown, series));
+                spearInvolved, lungeSwap, reachSwap, fromOnCooldown, series));
         while (RECORDS.size() > MAX_RECORDS) {
             RECORDS.removeFirst();
         }
@@ -84,9 +86,9 @@ public final class SwapHistory {
     public static synchronized long getLastSpearInterval() {
         List<SwapRecord> all = snapshot();
         for (int j = all.size() - 1; j >= 0; j--) {
-            if (all.get(j).lungeSpearInvolved()) {
+            if (all.get(j).lungeSwap()) {
                 for (int k = j - 1; k >= 0; k--) {
-                    if (all.get(k).lungeSpearInvolved()) {
+                    if (all.get(k).lungeSwap()) {
                         return all.get(j).timeMs() - all.get(k).timeMs();
                     }
                 }
@@ -97,11 +99,10 @@ public final class SwapHistory {
     }
 
     public static boolean isMeaningfulSwap(ItemStack from, ItemStack to) {
-        return !from.isEmpty()
-                && !to.isEmpty()
-                && from.getItem() != to.getItem()
-                && isWeapon(from)
-                && isWeapon(to);
+        if (from.isEmpty() || to.isEmpty() || from.getItem() == to.getItem()) {
+            return false;
+        }
+        return (isWeapon(from) && isWeapon(to)) || isSpear(from) || isSpear(to);
     }
 
     public static boolean isWeapon(ItemStack stack) {

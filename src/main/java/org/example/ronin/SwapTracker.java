@@ -36,21 +36,17 @@ public final class SwapTracker {
         if (SwapHistory.isMeaningfulSwap(from, current)) {
             ItemCooldownManager cooldowns = player.getItemCooldownManager();
             boolean fromOnCooldown = cooldowns.isCoolingDown(from);
-            boolean lungeSwap = isLungeSwap(from, current);
-            SwapHistory.record(from, current, fromOnCooldown, lungeSwap);
-            LOGGER.info("Свап: {} -> {} (копьё-свап: {}, КД снятого: {})",
-                    itemId(from), itemId(current), lungeSwap, fromOnCooldown);
+            boolean fromSpear = SwapHistory.isSpear(from) || matchesSlot(SwapConfig.spearSlot, from);
+            boolean toSpear = SwapHistory.isSpear(current) || matchesSlot(SwapConfig.spearSlot, current);
+            boolean lungeSwap = toSpear && !fromSpear;
+            boolean reachSwap = fromSpear && !toSpear;
+            SwapHistory.record(from, current, fromOnCooldown, lungeSwap, reachSwap);
+            LOGGER.info("Свап: {} -> {} (рывок: {}, дальность: {}, КД снятого: {})",
+                    itemId(from), itemId(current), lungeSwap, reachSwap, fromOnCooldown);
         } else {
             LOGGER.info("Смена предмета: {} -> {} (не записано: пусто или не оружие)",
                     itemId(from), itemId(current));
         }
-    }
-
-    public static boolean isLungeSwap(ItemStack from, ItemStack to) {
-        if (SwapHistory.isSpear(from) || SwapHistory.isSpear(to)) {
-            return true;
-        }
-        return matchesSlot(SwapConfig.spearSlot, from) || matchesSlot(SwapConfig.spearSlot, to);
     }
 
     public static boolean matchesSlot(int slot, ItemStack stack) {

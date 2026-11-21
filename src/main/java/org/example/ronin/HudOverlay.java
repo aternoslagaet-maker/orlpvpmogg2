@@ -31,11 +31,11 @@ public final class HudOverlay {
 
         String delta = "Δ " + SwapHistory.formatDuration(r.intervalMs());
         String spearDelta = "";
-        if (r.lungeSpearInvolved() && SwapHistory.getLastSpearInterval() >= 0) {
-            spearDelta = "Δ копьё " + SwapHistory.formatDuration(SwapHistory.getLastSpearInterval())
+        if (r.lungeSwap() && SwapHistory.getLastSpearInterval() >= 0) {
+            spearDelta = "Δ рывок " + SwapHistory.formatDuration(SwapHistory.getLastSpearInterval())
                     + " · серия " + r.lungeSeries();
         }
-        String cooldown = r.lungeSpearInvolved() && r.fromOnCooldown() ? "КД!" : "";
+        String cooldown = r.lungeSwap() && r.fromOnCooldown() ? "КД!" : "";
 
         int iconSize = 16;
         int pad = 3;
