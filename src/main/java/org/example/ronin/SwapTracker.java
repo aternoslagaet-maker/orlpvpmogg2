@@ -46,22 +46,26 @@ public final class SwapTracker {
         ItemStack from = lastStack;
         lastStack = current.copy();
 
-        if (SwapHistory.isMeaningfulSwap(from, current)) {
+        boolean fromSpear = SwapHistory.isSpear(from) || matchesSlot(SwapConfig.spearSlot, from);
+        boolean toSpear = SwapHistory.isSpear(current) || matchesSlot(SwapConfig.spearSlot, current);
+        long attackGapMs = lastAttackClickMs < 0L ? -1L : now - lastAttackClickMs;
+        boolean lungeSwap = toSpear && !fromSpear && attackGapMs >= 0
+                && attackGapMs <= LUNGE_ATTACK_WINDOW_MS;
+        boolean reachSwap = fromSpear && !toSpear && attackGapMs >= 0
+                && attackGapMs <= REACH_ATTACK_WINDOW_MS;
+
+        boolean meaningful = (SwapHistory.isWeapon(from) && SwapHistory.isWeapon(current))
+                || lungeSwap || reachSwap;
+
+        if (meaningful) {
             ItemCooldownManager cooldowns = player.getItemCooldownManager();
             boolean fromOnCooldown = cooldowns.isCoolingDown(from);
-            boolean fromSpear = SwapHistory.isSpear(from) || matchesSlot(SwapConfig.spearSlot, from);
-            boolean toSpear = SwapHistory.isSpear(current) || matchesSlot(SwapConfig.spearSlot, current);
-            long attackGapMs = lastAttackClickMs < 0L ? -1L : now - lastAttackClickMs;
-            boolean lungeSwap = toSpear && !fromSpear && attackGapMs >= 0
-                    && attackGapMs <= LUNGE_ATTACK_WINDOW_MS;
-            boolean reachSwap = fromSpear && !toSpear && attackGapMs >= 0
-                    && attackGapMs <= REACH_ATTACK_WINDOW_MS;
             SwapHistory.record(from, current, fromOnCooldown, lungeSwap, reachSwap, attackGapMs);
             LOGGER.info("Свап: {} -> {} (рывок: {}, дальность: {}, КД снятого: {}, удар {} мс назад)",
                     itemId(from), itemId(current), lungeSwap, reachSwap, fromOnCooldown,
                     attackGapMs < 0 ? "нет" : String.valueOf(attackGapMs));
         } else {
-            LOGGER.info("Смена предмета: {} -> {} (не записано: пусто или не оружие)",
+            LOGGER.info("Смена предмета: {} -> {} (не записано: обычный свап без атаки)",
                     itemId(from), itemId(current));
         }
     }

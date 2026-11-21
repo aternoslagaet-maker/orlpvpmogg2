@@ -89,7 +89,7 @@ public class SwapHistoryScreen extends Screen {
 
         if (total == 0) {
             context.drawCenteredTextWithShadow(this.textRenderer,
-                    Text.literal("Действенных свапов (оружие → оружие) пока не было"),
+                    Text.literal("Рабочих свапов (рывок/дальность) пока не было — остальное не пишется"),
                     this.width / 2, 60, 0xAAAAAA);
             return;
         }

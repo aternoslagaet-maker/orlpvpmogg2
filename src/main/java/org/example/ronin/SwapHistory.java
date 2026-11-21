@@ -53,9 +53,15 @@ public final class SwapHistory {
 
         int series = 0;
         if (lungeSwap) {
-            SwapRecord prev = all.isEmpty() ? null : all.get(all.size() - 1);
-            if (prev != null && prev.lungeSwap() && intervalMs >= 0 && intervalMs <= SERIES_GAP_MS) {
-                series = prev.lungeSeries() + 1;
+            SwapRecord prevLunge = null;
+            for (int i = all.size() - 1; i >= 0; i--) {
+                if (all.get(i).lungeSwap()) {
+                    prevLunge = all.get(i);
+                    break;
+                }
+            }
+            if (prevLunge != null && now - prevLunge.timeMs() <= SERIES_GAP_MS) {
+                series = prevLunge.lungeSeries() + 1;
             } else {
                 series = 1;
             }
@@ -84,6 +90,16 @@ public final class SwapHistory {
         return RECORDS.isEmpty() ? Optional.empty() : Optional.of(RECORDS.getLast());
     }
 
+    public static synchronized Optional<SwapRecord> lastLunge() {
+        List<SwapRecord> all = snapshot();
+        for (int i = all.size() - 1; i >= 0; i--) {
+            if (all.get(i).lungeSwap()) {
+                return Optional.of(all.get(i));
+            }
+        }
+        return Optional.empty();
+    }
+
     public static synchronized long getLastSpearInterval() {
         List<SwapRecord> all = snapshot();
         for (int j = all.size() - 1; j >= 0; j--) {
@@ -97,13 +113,6 @@ public final class SwapHistory {
             }
         }
         return -1L;
-    }
-
-    public static boolean isMeaningfulSwap(ItemStack from, ItemStack to) {
-        if (from.isEmpty() || to.isEmpty() || from.getItem() == to.getItem()) {
-            return false;
-        }
-        return (isWeapon(from) && isWeapon(to)) || isSpear(from) || isSpear(to);
     }
 
     public static boolean isWeapon(ItemStack stack) {
