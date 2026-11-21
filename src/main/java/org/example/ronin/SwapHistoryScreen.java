@@ -32,6 +32,16 @@ public class SwapHistoryScreen extends Screen {
 
     @Override
     protected void init() {
+        addDrawableChild(ButtonWidget.builder(Text.literal(spearSlotLabel()), b -> {
+            SwapConfig.spearSlot = SwapConfig.nextSlot(SwapConfig.spearSlot);
+            b.setMessage(Text.literal(spearSlotLabel()));
+        }).dimensions(this.width / 2 - 150, 36, 145, 16).build());
+
+        addDrawableChild(ButtonWidget.builder(Text.literal(partnerSlotLabel()), b -> {
+            SwapConfig.partnerSlot = SwapConfig.nextSlot(SwapConfig.partnerSlot);
+            b.setMessage(Text.literal(partnerSlotLabel()));
+        }).dimensions(this.width / 2 + 5, 36, 145, 16).build());
+
         int y = this.height - 26;
 
         this.prevButton = addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
@@ -88,7 +98,7 @@ public class SwapHistoryScreen extends Screen {
         int end = Math.min(total - this.page * ROWS_PER_PAGE, total);
 
         int x = this.width / 2 - 100;
-        int y = 44;
+        int y = 58;
 
         for (int i = end - 1; i >= start; i--) {
             SwapHistory.SwapRecord r = records.get(i);
@@ -196,5 +206,17 @@ public class SwapHistoryScreen extends Screen {
 
     private int pageCount(int total) {
         return (int) Math.max(1, (total + ROWS_PER_PAGE - 1) / ROWS_PER_PAGE);
+    }
+
+    private String spearSlotLabel() {
+        return "Копьё: " + slotName(SwapConfig.spearSlot);
+    }
+
+    private String partnerSlotLabel() {
+        return "Свап-предмет: " + slotName(SwapConfig.partnerSlot);
+    }
+
+    private String slotName(int slot) {
+        return slot == SwapConfig.NO_SLOT ? "любой" : "слот " + (slot + 1);
     }
 }

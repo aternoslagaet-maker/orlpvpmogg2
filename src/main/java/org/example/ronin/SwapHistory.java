@@ -41,9 +41,8 @@ public final class SwapHistory {
     ) {
     }
 
-    public static synchronized void record(ItemStack from, ItemStack to, boolean fromOnCooldown) {
-        boolean spearInvolved = isSpear(from) || isSpear(to);
-        boolean lungeSpearInvolved = isLungeSpear(from) || isLungeSpear(to);
+    public static synchronized void record(ItemStack from, ItemStack to, boolean fromOnCooldown, boolean lungeSpearInvolved) {
+        boolean spearInvolved = lungeSpearInvolved || isSpear(from) || isSpear(to);
         long now = System.currentTimeMillis();
 
         List<SwapRecord> all = snapshot();
@@ -135,24 +134,6 @@ public final class SwapHistory {
         }
         Identifier id = Registries.ITEM.getId(stack.getItem());
         return id != null && (id.getPath().contains("spear") || id.getPath().contains("trident"));
-    }
-
-    public static boolean isLungeSpear(ItemStack stack) {
-        return isSpear(stack) && hasLunge(stack);
-    }
-
-    private static boolean hasLunge(ItemStack stack) {
-        ItemEnchantmentsComponent component = stack.get(DataComponentTypes.ENCHANTMENTS);
-        if (component == null) {
-            return false;
-        }
-        for (RegistryEntry<Enchantment> entry : component.getEnchantments()) {
-            Identifier id = entry.getKey().map(RegistryKey::getValue).orElse(null);
-            if (id != null && "lunge".equals(id.getPath())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static Set<String> enchantKeys(ItemStack stack) {
