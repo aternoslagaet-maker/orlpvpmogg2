@@ -38,12 +38,13 @@ public final class SwapHistory {
             boolean lungeSwap,
             boolean reachSwap,
             boolean fromOnCooldown,
-            int lungeSeries
+            int lungeSeries,
+            long attackGapMs
     ) {
     }
 
     public static synchronized void record(ItemStack from, ItemStack to, boolean fromOnCooldown,
-                                           boolean lungeSwap, boolean reachSwap) {
+                                           boolean lungeSwap, boolean reachSwap, long attackGapMs) {
         boolean spearInvolved = lungeSwap || reachSwap || isSpear(from) || isSpear(to);
         long now = System.currentTimeMillis();
 
@@ -61,7 +62,7 @@ public final class SwapHistory {
         }
 
         RECORDS.addLast(new SwapRecord(now, from.copy(), to.copy(), intervalMs,
-                spearInvolved, lungeSwap, reachSwap, fromOnCooldown, series));
+                spearInvolved, lungeSwap, reachSwap, fromOnCooldown, series, attackGapMs));
         while (RECORDS.size() > MAX_RECORDS) {
             RECORDS.removeFirst();
         }

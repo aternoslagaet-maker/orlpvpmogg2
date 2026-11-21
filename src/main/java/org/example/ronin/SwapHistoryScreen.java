@@ -173,8 +173,14 @@ public class SwapHistoryScreen extends Screen {
             lines.add(r.fromOnCooldown()
                     ? Text.literal("Свап на копьё (рывок): КД снятого предмета есть — неэффективно").formatted(Formatting.RED)
                     : Text.literal("Свап на копьё (рывок): КД снятого предмета нет — эффективный скип КД").formatted(Formatting.GREEN));
+            lines.add(Text.literal("Удар ЛКМ был за " + SwapHistory.formatDuration(r.attackGapMs()) + " до свапа")
+                    .formatted(Formatting.GRAY));
         } else if (r.reachSwap()) {
-            lines.add(Text.literal("Свап с копья — ради дальности (не рывок)").formatted(Formatting.GRAY));
+            lines.add(Text.literal("Свап с копья — ради дальности, удар одновременно (не рывок)").formatted(Formatting.GRAY));
+            lines.add(Text.literal("Удар ЛКМ был за " + SwapHistory.formatDuration(r.attackGapMs()) + " до свапа")
+                    .formatted(Formatting.GRAY));
+        } else {
+            lines.add(Text.literal("Простая смена слота без удара — не рывок и не дальность").formatted(Formatting.DARK_GRAY));
         }
 
         return lines;
