@@ -35,12 +35,17 @@ public class SwapHistoryScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(Text.literal(spearSlotLabel()), b -> {
             SwapConfig.spearSlot = SwapConfig.nextSlot(SwapConfig.spearSlot);
             b.setMessage(Text.literal(spearSlotLabel()));
-        }).dimensions(this.width / 2 - 150, 36, 145, 16).build());
+        }).dimensions(this.width / 2 - 150, 36, 98, 16).build());
 
         addDrawableChild(ButtonWidget.builder(Text.literal(partnerSlotLabel()), b -> {
             SwapConfig.partnerSlot = SwapConfig.nextSlot(SwapConfig.partnerSlot);
             b.setMessage(Text.literal(partnerSlotLabel()));
-        }).dimensions(this.width / 2 + 5, 36, 145, 16).build());
+        }).dimensions(this.width / 2 - 49, 36, 98, 16).build());
+
+        addDrawableChild(ButtonWidget.builder(Text.literal(seriesGapLabel()), b -> {
+            SwapConfig.seriesGapMs = SwapConfig.nextSeriesGap(SwapConfig.seriesGapMs);
+            b.setMessage(Text.literal(seriesGapLabel()));
+        }).dimensions(this.width / 2 + 52, 36, 98, 16).build());
 
         int y = this.height - 26;
 
@@ -229,5 +234,10 @@ public class SwapHistoryScreen extends Screen {
 
     private String slotName(int slot) {
         return slot == SwapConfig.NO_SLOT ? "любой" : "слот " + (slot + 1);
+    }
+
+    private String seriesGapLabel() {
+        long gap = SwapConfig.seriesGapMs;
+        return "Пауза серии: " + (gap < 0 ? "выкл" : (gap / 1000) + "с");
     }
 }

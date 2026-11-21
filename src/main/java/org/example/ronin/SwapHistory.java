@@ -22,7 +22,6 @@ import java.util.Set;
 public final class SwapHistory {
 
     public static final int MAX_RECORDS = 500;
-    public static final long SERIES_GAP_MS = 3000L;
 
     private static final ArrayDeque<SwapRecord> RECORDS = new ArrayDeque<>();
 
@@ -60,7 +59,8 @@ public final class SwapHistory {
                     break;
                 }
             }
-            if (prevLunge != null && now - prevLunge.timeMs() <= SERIES_GAP_MS) {
+            if (prevLunge != null && (SwapConfig.seriesGapMs < 0
+                    || now - prevLunge.timeMs() <= SwapConfig.seriesGapMs)) {
                 series = prevLunge.lungeSeries() + 1;
             } else {
                 series = 1;
