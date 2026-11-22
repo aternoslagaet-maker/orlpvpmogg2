@@ -19,7 +19,12 @@ public final class SwapTracker {
 
     public static final long LUNGE_ATTACK_WINDOW_MS = 400;
     public static final long REACH_ATTACK_WINDOW_MS = 150;
+    public static final long SLOW_TRANSITION_MS = 150;
+    public static final long REACH_LATE_SLOT_MS = 60;
     public static final float AIM_GREEN_MAX_DEG = 5.0f;
+
+    public static String lastIssueText = "";
+    public static int lastIssueColor = 0xFFAAAAAA;
 
     private static ItemStack lastStack = ItemStack.EMPTY;
     private static boolean lastAttackKeyDown = false;
@@ -59,6 +64,10 @@ public final class SwapTracker {
         boolean reachSwap = fromSpear && !toSpear && attackGapMs >= 0
                 && attackGapMs <= REACH_ATTACK_WINDOW_MS;
 
+        ItemCooldownManager cooldowns = player.getItemCooldownManager();
+        boolean fromOnCooldown = cooldowns.isCoolingDown(from);
+        diagnose(fromSpear, toSpear, lungeSwap, reachSwap, attackGapMs, fromOnCooldown);
+
         boolean meaningful = (SwapHistory.isWeapon(from) && SwapHistory.isWeapon(current))
                 || lungeSwap || reachSwap;
 
@@ -68,8 +77,6 @@ public final class SwapTracker {
             return;
         }
 
-        ItemCooldownManager cooldowns = player.getItemCooldownManager();
-        boolean fromOnCooldown = cooldowns.isCoolingDown(from);
         float pitchDeg = player.getPitch(1.0f);
         SwapHistory.record(from, current, fromOnCooldown, lungeSwap, reachSwap, attackGapMs, pitchDeg);
 
@@ -80,6 +87,46 @@ public final class SwapTracker {
         if (lungeSwap) {
             playLungeSound(client, !fromOnCooldown, pitchDeg);
             updateGoal(client, player, !fromOnCooldown, pitchDeg);
+        }
+    }
+
+    private static void diagnose(boolean fromSpear, boolean toSpear, boolean lungeSwap, boolean reachSwap,
+                                 long attackGapMs, boolean fromOnCooldown) {
+        lastIssueText = "";
+        if (lungeSwap) {
+            if (fromOnCooldown) {
+                if (attackGapMs > SLOW_TRANSITION_MS) {
+                    lastIssueText = "КД: поздний переход — удар за " + attackGapMs + " мс";
+                } else {
+                    lastIssueText = "КД: слишком рано — снятый предмет ещё остывает";
+                }
+                lastIssueColor = 0xFFFF5555;
+            }
+            return;
+        }
+        if (toSpear && !fromSpear) {
+            if (attackGapMs < 0) {
+                lastIssueText = "Нет удара ЛКМ перед свапом — рывок не засчитан";
+                lastIssueColor = 0xFFFF5555;
+            } else if (attackGapMs > LUNGE_ATTACK_WINDOW_MS) {
+                lastIssueText = "Поздно свапнул на копьё (удар за " + attackGapMs + " мс)";
+                lastIssueColor = 0xFFFFFF55;
+            }
+            return;
+        }
+        if (fromSpear && !toSpear && !reachSwap) {
+            if (attackGapMs < 0) {
+                lastIssueText = "Нет удара при свапе с копья — дальность не засчитана";
+                lastIssueColor = 0xFFFF5555;
+            } else if (attackGapMs > REACH_ATTACK_WINDOW_MS) {
+                lastIssueText = "Поздно ударил (" + attackGapMs + " мс) — дальность не засчитана";
+                lastIssueColor = 0xFFFFFF55;
+            }
+            return;
+        }
+        if (reachSwap && attackGapMs > REACH_LATE_SLOT_MS) {
+            lastIssueText = "Дальность: слот поздновато (удар за " + attackGapMs + " мс)";
+            lastIssueColor = 0xFFFFFF55;
         }
     }
 

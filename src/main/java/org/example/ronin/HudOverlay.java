@@ -4,18 +4,20 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public final class HudOverlay {
+
+    public static final int[] LAST_RECT = new int[4];
+    public static boolean LAST_RECT_VALID = false;
 
     private static final int COLOR_TEXT = 0xFFFFFFFF;
     private static final int COLOR_GRAY = 0xFFAAAAAA;
     private static final int COLOR_SPEAR = 0xFF45FF45;
     private static final int COLOR_BAD = 0xFFFF5555;
     private static final int COLOR_BACKGROUND = 0x64000000;
-
-    public static final int[] LAST_RECT = new int[4];
-    public static boolean LAST_RECT_VALID = false;
 
     private static final float PITCH_MAX_GOOD_DEG = 5.0f;
     private static final float PITCH_WARN_DEG = 15.0f;
@@ -39,139 +41,90 @@ public final class HudOverlay {
         SwapHistory.SwapRecord r = last.get();
         boolean fullProfile = SwapConfig.hudProfile != 0;
 
-        String delta = "Δ " + SwapHistory.formatDuration(r.intervalMs());
-
-        String spearDelta = "";
-        long spearInterval = SwapHistory.getLastSpearInterval();
-        Optional<SwapHistory.SwapRecord> lastLunge = SwapHistory.lastLunge();
-        if (spearInterval >= 0 && lastLunge.isPresent()) {
-            spearDelta = "Δ рывок " + SwapHistory.formatDuration(spearInterval)
-                    + " · серия " + lastLunge.get().lungeSeries();
-        }
-        String cooldown = lastLunge.map(SwapHistory.SwapRecord::fromOnCooldown).orElse(false) ? "КД!" : "";
-
-        String recordText = "";
-        int recordColor = COLOR_GRAY;
-        if (fullProfile && lastLunge.isPresent() && lastLunge.get().recordDiffMs() != SwapHistory.NO_PREV_RECORD
-                && lastLunge.get().intervalMs() >= 0) {
-            if (lastLunge.get().recordDiffMs() <= 0) {
-                recordText = "Δ: " + SwapHistory.formatDuration(lastLunge.get().intervalMs())
-                        + " (РЕКОРД " + lastLunge.get().recordDiffMs() + "мс)";
-                recordColor = 0xFFFFD455;
-            } else {
-                recordText = "+" + lastLunge.get().recordDiffMs() + "мс к рекорду";
-                recordColor = COLOR_GRAY;
-            }
-        }
-
-        String goalText = "";
-        int goalColor = COLOR_GRAY;
-        if (fullProfile) {
-            SwapConfig.Goal goal = SwapConfig.currentGoal();
-            if (SwapConfig.goalCompleted) {
-                goalText = "✓ " + goal.name();
-                goalColor = COLOR_SPEAR;
-            } else if (goal != null) {
-                goalText = "Цель: " + SwapConfig.goalProgress + "/" + goal.count();
-                goalColor = SwapConfig.goalProgress > 0 ? COLOR_TEXT : COLOR_GRAY;
-            }
-        }
-
         int pad = 3;
         int iconSize = 16;
         int textX = pad + iconSize + pad + 6 + iconSize + pad + 2;
 
-        String pitchLabel = "рывок: ";
-        float pitch = client.player.getPitch(0.0f);
-        String pitchValue = String.format("%.1f°", pitch);
-        int pitchColor = pitchColor(pitch);
-        boolean showPitch = fullProfile && lastLunge.isPresent();
+        List<String> lines = new ArrayList<>();
+        List<Integer> colors = new ArrayList<>();
+        lines.add("Δ " + SwapHistory.formatDuration(r.intervalMs()));
+        colors.add(COLOR_TEXT);
 
-        int width = textX + client.textRenderer.getWidth(delta) + pad;
-        int line2Width = 0;
-        if (fullProfile && !spearDelta.isEmpty()) {
-            line2Width = client.textRenderer.getWidth(spearDelta)
-                    + (cooldown.isEmpty() ? 0 : client.textRenderer.getWidth(cooldown) + 3);
-            width = Math.max(width, textX + line2Width + pad);
-        }
-        if (showPitch) {
-            int line3 = client.textRenderer.getWidth(pitchLabel)
-                    + client.textRenderer.getWidth(pitchValue);
-            width = Math.max(width, textX + line3 + pad);
-        }
-        if (!recordText.isEmpty()) {
-            width = Math.max(width, textX + client.textRenderer.getWidth(recordText) + pad);
-        }
-        if (!goalText.isEmpty()) {
-            width = Math.max(width, textX + client.textRenderer.getWidth(goalText) + pad);
+        if (!SwapTracker.lastIssueText.isEmpty()) {
+            lines.add(SwapTracker.lastIssueText);
+            colors.add(SwapTracker.lastIssueColor);
         }
 
-        int row1Y = pad + 1;
-        int row2Y = pad + 12;
-        int row3Y = pad + 23;
+        if (fullProfile) {
+            long spearInterval = SwapHistory.getLastSpearInterval();
+            Optional<SwapHistory.SwapRecord> lastLunge = SwapHistory.lastLunge();
+            if (spearInterval >= 0 && lastLunge.isPresent()) {
+                String spearDelta = "Δ рывок " + SwapHistory.formatDuration(spearInterval)
+                        + " · серия " + lastLunge.get().lungeSeries();
+                lines.add(spearDelta + (lastLunge.get().fromOnCooldown() ? "  КД!" : ""));
+                colors.add(COLOR_SPEAR);
+            }
 
-        int rows = fullProfile ? countRows(spearDelta, showPitch, recordText, goalText) : 1;
-        int height = row1Y + rows * 11 + pad;
+            if (lastLunge.isPresent() && lastLunge.get().recordDiffMs() != SwapHistory.NO_PREV_RECORD
+                    && lastLunge.get().intervalMs() >= 0) {
+                if (lastLunge.get().recordDiffMs() <= 0) {
+                    lines.add("Δ: " + SwapHistory.formatDuration(lastLunge.get().intervalMs())
+                            + " (РЕКОРД " + lastLunge.get().recordDiffMs() + "мс)");
+                    colors.add(0xFFFFD455);
+                } else {
+                    lines.add("+" + lastLunge.get().recordDiffMs() + "мс к рекорду");
+                    colors.add(COLOR_GRAY);
+                }
+            }
+
+            if (lastLunge.isPresent()) {
+                float pitch = client.player.getPitch(0.0f);
+                lines.add("рывок: " + String.format("%.1f°", pitch));
+                colors.add(pitchColor(pitch));
+            }
+
+            SwapConfig.Goal goal = SwapConfig.currentGoal();
+            if (SwapConfig.goalCompleted) {
+                lines.add("✓ " + goal.name());
+                colors.add(COLOR_SPEAR);
+            } else if (goal != null) {
+                lines.add("Цель: " + SwapConfig.goalProgress + "/" + goal.count());
+                colors.add(SwapConfig.goalProgress > 0 ? COLOR_TEXT : COLOR_GRAY);
+            }
+        }
+
+        int width = 0;
+        for (String line : lines) {
+            width = Math.max(width, textX + client.textRenderer.getWidth(line) + pad);
+        }
+        width = Math.max(width, textX + 4);
 
         int scaledWidth = client.getWindow().getScaledWidth();
         int scaledHeight = client.getWindow().getScaledHeight();
         int ox = Math.max(0, Math.min(SwapConfig.hudX, Math.max(0, scaledWidth - width)));
-        int oy = Math.max(0, Math.min(SwapConfig.hudY, Math.max(0, scaledHeight - height)));
+        int oy = Math.max(0, Math.min(SwapConfig.hudY, Math.max(0, scaledHeight - height(lines.size(), pad))));
+        int totalHeight = height(lines.size(), pad);
         LAST_RECT[0] = ox;
         LAST_RECT[1] = oy;
         LAST_RECT[2] = width;
-        LAST_RECT[3] = height;
+        LAST_RECT[3] = totalHeight;
         LAST_RECT_VALID = true;
 
-        context.fill(ox, oy, ox + width, oy + height, COLOR_BACKGROUND);
+        context.fill(ox, oy, ox + width, oy + totalHeight, COLOR_BACKGROUND);
 
         drawStack(context, r.from(), ox + pad, oy + pad);
         context.drawTextWithShadow(client.textRenderer, "→", ox + pad + iconSize + 1, oy + pad + 4, COLOR_TEXT);
         drawStack(context, r.to(), ox + pad + iconSize + pad + 4, oy + pad);
 
-        context.drawTextWithShadow(client.textRenderer, delta, ox + textX, oy + row1Y, COLOR_TEXT);
-
-        if (fullProfile) {
-            int line = row2Y;
-            if (!spearDelta.isEmpty()) {
-                context.drawTextWithShadow(client.textRenderer, spearDelta, ox + textX, oy + line, COLOR_SPEAR);
-                if (!cooldown.isEmpty()) {
-                    context.drawTextWithShadow(client.textRenderer, cooldown,
-                            ox + textX + client.textRenderer.getWidth(spearDelta) + 3, oy + line, COLOR_BAD);
-                }
-                line += 11;
-            }
-            if (!recordText.isEmpty()) {
-                context.drawTextWithShadow(client.textRenderer, recordText, ox + textX, oy + line, recordColor);
-                line += 11;
-            }
-            if (showPitch) {
-                int valueX = ox + textX + client.textRenderer.getWidth(pitchLabel);
-                context.drawTextWithShadow(client.textRenderer, pitchLabel, ox + textX, oy + line, COLOR_GRAY);
-                context.drawTextWithShadow(client.textRenderer, pitchValue, valueX, oy + line, pitchColor);
-                line += 11;
-            }
-            if (!goalText.isEmpty()) {
-                context.drawTextWithShadow(client.textRenderer, goalText, ox + textX, oy + line, goalColor);
-            }
+        int y = oy + pad + 1;
+        for (int i = 0; i < lines.size(); i++) {
+            context.drawTextWithShadow(client.textRenderer, lines.get(i), ox + textX, y, colors.get(i));
+            y += 11;
         }
     }
 
-    private static int countRows(String spearDelta, boolean showPitch, String recordText, String goalText) {
-        int rows = 1;
-        if (!spearDelta.isEmpty()) {
-            rows++;
-        }
-        if (!recordText.isEmpty()) {
-            rows++;
-        }
-        if (showPitch) {
-            rows++;
-        }
-        if (!goalText.isEmpty()) {
-            rows++;
-        }
-        return rows;
+    private static int height(int lineCount, int pad) {
+        return pad + 1 + lineCount * 11 + pad;
     }
 
     private static int pitchColor(float pitch) {
