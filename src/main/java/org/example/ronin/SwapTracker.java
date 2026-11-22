@@ -9,6 +9,7 @@ import net.minecraft.registry.Registries;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,14 +22,18 @@ public final class SwapTracker {
     public static final long REACH_ATTACK_WINDOW_MS = 150;
     public static final long SLOW_TRANSITION_MS = 150;
     public static final long REACH_LATE_SLOT_MS = 60;
+    public static final long STALE_ATTACK_MS = 1000;
     public static final float AIM_GREEN_MAX_DEG = 5.0f;
 
     public static String lastIssueText = "";
     public static int lastIssueColor = 0xFFAAAAAA;
+    public static String lastHitText = "";
+    public static int lastHitColor = 0xFF45FF45;
 
     private static ItemStack lastStack = ItemStack.EMPTY;
     private static boolean lastAttackKeyDown = false;
     private static long lastAttackClickMs = -1L;
+    private static boolean lastAttackHitEntity = false;
 
     private SwapTracker() {
     }
@@ -45,6 +50,8 @@ public final class SwapTracker {
         boolean attackDown = client.options.attackKey.isPressed();
         if (attackDown && !lastAttackKeyDown) {
             lastAttackClickMs = now;
+            lastAttackHitEntity = client.crosshairTarget != null
+                    && client.crosshairTarget.getType() == HitResult.Type.ENTITY;
         }
         lastAttackKeyDown = attackDown;
 
@@ -60,6 +67,9 @@ public final class SwapTracker {
         boolean toSpear = SwapHistory.isSpear(current) || matchesSlot(SwapConfig.spearSlot, current);
         boolean toIsWeapon = SwapHistory.isWeapon(current);
         long attackGapMs = lastAttackClickMs < 0L ? -1L : now - lastAttackClickMs;
+        if (attackGapMs > STALE_ATTACK_MS) {
+            attackGapMs = -1L;
+        }
         boolean lungeSwap = toSpear && !fromSpear && attackGapMs >= 0
                 && attackGapMs <= LUNGE_ATTACK_WINDOW_MS;
         boolean reachSwap = fromSpear && !toSpear && toIsWeapon && attackGapMs >= 0
@@ -67,10 +77,16 @@ public final class SwapTracker {
 
         ItemCooldownManager cooldowns = player.getItemCooldownManager();
         boolean fromOnCooldown = cooldowns.isCoolingDown(from);
+        if (fromSpear && !toSpear && toIsWeapon && attackGapMs >= 0) {
+            lastHitText = lastAttackHitEntity ? "Дальность: попал по цели ✓" : "Дальность: не попал по цели";
+            lastHitColor = lastAttackHitEntity ? 0xFF45FF45 : 0xFFFFA555;
+        } else {
+            lastHitText = "";
+        }
         diagnose(fromSpear, toSpear, lungeSwap, reachSwap, attackGapMs, fromOnCooldown, toIsWeapon);
 
-        boolean meaningful = (SwapHistory.isWeapon(from) && SwapHistory.isWeapon(current))
-                || lungeSwap || reachSwap;
+        boolean meaningful = lungeSwap || reachSwap
+                || (SwapHistory.isWeapon(from) && SwapHistory.isWeapon(current) && !toSpear && !fromSpear);
 
         if (!meaningful) {
             LOGGER.info("Смена предмета: {} -> {} (не записано: обычный свап без атаки)",
@@ -110,10 +126,7 @@ public final class SwapTracker {
             return;
         }
         if (toSpear && !fromSpear) {
-            if (attackGapMs < 0) {
-                lastIssueText = "Нет удара ЛКМ перед свапом — рывок не засчитан";
-                lastIssueColor = 0xFFFF5555;
-            } else {
+            if (attackGapMs >= 0) {
                 lastIssueText = "Поздно свапнул на копьё (удар за " + attackGapMs + " мс)";
                 lastIssueColor = 0xFFFFFF55;
             }
@@ -123,10 +136,7 @@ public final class SwapTracker {
             if (!toIsWeapon) {
                 return;
             }
-            if (attackGapMs < 0) {
-                lastIssueText = "Нет удара при свапе с копья — дальность не засчитана";
-                lastIssueColor = 0xFFFF5555;
-            } else {
+            if (attackGapMs >= 0) {
                 lastIssueText = "Поздно ударил (" + attackGapMs + " мс) — дальность не засчитана";
                 lastIssueColor = 0xFFFFFF55;
             }
