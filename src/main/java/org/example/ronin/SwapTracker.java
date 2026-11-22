@@ -58,15 +58,16 @@ public final class SwapTracker {
 
         boolean fromSpear = SwapHistory.isSpear(from) || matchesSlot(SwapConfig.spearSlot, from);
         boolean toSpear = SwapHistory.isSpear(current) || matchesSlot(SwapConfig.spearSlot, current);
+        boolean toIsWeapon = SwapHistory.isWeapon(current);
         long attackGapMs = lastAttackClickMs < 0L ? -1L : now - lastAttackClickMs;
         boolean lungeSwap = toSpear && !fromSpear && attackGapMs >= 0
                 && attackGapMs <= LUNGE_ATTACK_WINDOW_MS;
-        boolean reachSwap = fromSpear && !toSpear && attackGapMs >= 0
+        boolean reachSwap = fromSpear && !toSpear && toIsWeapon && attackGapMs >= 0
                 && attackGapMs <= REACH_ATTACK_WINDOW_MS;
 
         ItemCooldownManager cooldowns = player.getItemCooldownManager();
         boolean fromOnCooldown = cooldowns.isCoolingDown(from);
-        diagnose(fromSpear, toSpear, lungeSwap, reachSwap, attackGapMs, fromOnCooldown);
+        diagnose(fromSpear, toSpear, lungeSwap, reachSwap, attackGapMs, fromOnCooldown, toIsWeapon);
 
         boolean meaningful = (SwapHistory.isWeapon(from) && SwapHistory.isWeapon(current))
                 || lungeSwap || reachSwap;
@@ -91,8 +92,7 @@ public final class SwapTracker {
     }
 
     private static void diagnose(boolean fromSpear, boolean toSpear, boolean lungeSwap, boolean reachSwap,
-                                 long attackGapMs, boolean fromOnCooldown) {
-        lastIssueText = "";
+                                 long attackGapMs, boolean fromOnCooldown, boolean toIsWeapon) {
         if (lungeSwap) {
             if (fromOnCooldown) {
                 if (attackGapMs > SLOW_TRANSITION_MS) {
@@ -101,6 +101,11 @@ public final class SwapTracker {
                     lastIssueText = "КД: слишком рано — снятый предмет ещё остывает";
                 }
                 lastIssueColor = 0xFFFF5555;
+            } else if (attackGapMs > SLOW_TRANSITION_MS) {
+                lastIssueText = "Свап с опозданием — удар за " + attackGapMs + " мс (оптимум ~40)";
+                lastIssueColor = 0xFFFFFF55;
+            } else {
+                lastIssueText = "";
             }
             return;
         }
@@ -108,17 +113,20 @@ public final class SwapTracker {
             if (attackGapMs < 0) {
                 lastIssueText = "Нет удара ЛКМ перед свапом — рывок не засчитан";
                 lastIssueColor = 0xFFFF5555;
-            } else if (attackGapMs > LUNGE_ATTACK_WINDOW_MS) {
+            } else {
                 lastIssueText = "Поздно свапнул на копьё (удар за " + attackGapMs + " мс)";
                 lastIssueColor = 0xFFFFFF55;
             }
             return;
         }
         if (fromSpear && !toSpear && !reachSwap) {
+            if (!toIsWeapon) {
+                return;
+            }
             if (attackGapMs < 0) {
                 lastIssueText = "Нет удара при свапе с копья — дальность не засчитана";
                 lastIssueColor = 0xFFFF5555;
-            } else if (attackGapMs > REACH_ATTACK_WINDOW_MS) {
+            } else {
                 lastIssueText = "Поздно ударил (" + attackGapMs + " мс) — дальность не засчитана";
                 lastIssueColor = 0xFFFFFF55;
             }
