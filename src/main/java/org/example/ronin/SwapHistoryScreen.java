@@ -1,5 +1,6 @@
 package org.example.ronin;
 
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -40,7 +41,7 @@ public class SwapHistoryScreen extends Screen {
         super(Text.literal("История свапов"));
     }
 
-    public SwapHistoryScreen(Screen parent) {
+    public SwapHistoryScreen(@SuppressWarnings("unused") Screen parent) {
         super(Text.literal("История свапов"));
     }
 
@@ -459,36 +460,36 @@ public class SwapHistoryScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (this.tab == TAB_SETTINGS && button == 0 && HudOverlay.LAST_RECT_VALID) {
+    public boolean mouseClicked(Click click, boolean doubled) {
+        if (this.tab == TAB_SETTINGS && click.button() == 0 && HudOverlay.LAST_RECT_VALID) {
             int[] rect = HudOverlay.LAST_RECT;
-            if (mouseX >= rect[0] && mouseX < rect[0] + rect[2]
-                    && mouseY >= rect[1] && mouseY < rect[1] + rect[3]) {
+            if (click.x() >= rect[0] && click.x() < rect[0] + rect[2]
+                    && click.y() >= rect[1] && click.y() < rect[1] + rect[3]) {
                 this.draggingHud = true;
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, doubled);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
         if (this.draggingHud) {
-            SwapConfig.hudX = Math.max(0, SwapConfig.hudX + (int) Math.round(deltaX));
-            SwapConfig.hudY = Math.max(0, SwapConfig.hudY + (int) Math.round(deltaY));
+            SwapConfig.hudX = Math.max(0, SwapConfig.hudX + (int) Math.round(offsetX));
+            SwapConfig.hudY = Math.max(0, SwapConfig.hudY + (int) Math.round(offsetY));
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return super.mouseDragged(click, offsetX, offsetY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(Click click) {
         if (this.draggingHud) {
             this.draggingHud = false;
             SwapConfig.save();
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(click);
     }
 
     @Override
