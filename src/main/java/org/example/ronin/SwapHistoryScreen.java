@@ -161,6 +161,13 @@ public class SwapHistoryScreen extends Screen {
                 b.setMessage(Text.literal(SwapConfig.soundChoiceLabel()));
                 SwapTracker.previewSound(this.client);
             }).dimensions(this.width / 2 + 5, this.height - 156, 190, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal("Редактор строк HUD…"), b -> {
+                if (this.client != null) {
+                    SwapConfig.save();
+                    this.client.setScreen(new HudEditorScreen());
+                }
+            }).dimensions(this.width / 2 - 195, this.height - 182, 390, 20).build());
         }
     }
 

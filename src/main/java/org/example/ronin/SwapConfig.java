@@ -1,6 +1,7 @@
 package org.example.ronin;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.registry.Registries;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 public final class SwapConfig {
 
@@ -35,6 +37,22 @@ public final class SwapConfig {
             "block.note_block.imitate.ender_dragon",
             "block.note_block.imitate.wither_skeleton",
             "block.note_block.imitate.piglin"
+    };
+
+    public static final String[] HUD_LINE_NAMES = {
+            "Δ свапа", "Диагностика", "Попадание", "Pearl Catch",
+            "Рывок · серия", "Рекорд", "Прицел", "Цель"
+    };
+
+    public static final String[] HUD_LINE_DEFAULTS = {
+            "Δ {delta}",
+            "{issue}",
+            "{hit}",
+            "{pearl}",
+            "Δ рывок {lunge} · серия {series} {cd}",
+            "{record}",
+            "рывок: {pitch}°",
+            "{goal}"
     };
 
     public static final long BENCHMARK_ONE_TICK_MS = 50;
@@ -63,6 +81,14 @@ public final class SwapConfig {
     public static boolean goalCompleted = false;
     public static int hudX = 3;
     public static int hudY = 3;
+
+    private static boolean[] lineVisible = new boolean[HUD_LINE_NAMES.length];
+    private static String[] lineFormat = new String[HUD_LINE_NAMES.length];
+
+    static {
+        Arrays.fill(lineVisible, true);
+        System.arraycopy(HUD_LINE_DEFAULTS, 0, lineFormat, 0, HUD_LINE_NAMES.length);
+    }
 
     private SwapConfig() {
     }
@@ -136,6 +162,31 @@ public final class SwapConfig {
         return isGoalEnabled() ? GOALS[goalIndex] : null;
     }
 
+    public static boolean hudLineVisible(int index) {
+        return lineVisible[clamp(index, 0, HUD_LINE_NAMES.length - 1)];
+    }
+
+    public static void setHudLineVisible(int index, boolean value) {
+        lineVisible[clamp(index, 0, HUD_LINE_NAMES.length - 1)] = value;
+    }
+
+    public static String hudLineFormat(int index) {
+        return lineFormat[clamp(index, 0, HUD_LINE_NAMES.length - 1)];
+    }
+
+    public static void setHudLineFormat(int index, String value) {
+        lineFormat[clamp(index, 0, HUD_LINE_NAMES.length - 1)] = value == null ? "" : value;
+    }
+
+    public static void resetHudLineFormat(int index) {
+        int i = clamp(index, 0, HUD_LINE_NAMES.length - 1);
+        lineFormat[i] = HUD_LINE_DEFAULTS[i];
+    }
+
+    public static int hudLineCount() {
+        return HUD_LINE_NAMES.length;
+    }
+
     private static Path configPath() {
         return FabricLoader.getInstance().getConfigDir().resolve("orlpvpmogg.json");
     }
@@ -164,6 +215,18 @@ public final class SwapConfig {
             goalCompleted = obj.has("goalCompleted") && obj.get("goalCompleted").getAsBoolean();
             hudX = obj.has("hudX") ? Math.max(0, obj.get("hudX").getAsInt()) : 3;
             hudY = obj.has("hudY") ? Math.max(0, obj.get("hudY").getAsInt()) : 3;
+            if (obj.has("hudLineVisible") && obj.get("hudLineVisible").isJsonArray()) {
+                JsonArray vis = obj.getAsJsonArray("hudLineVisible");
+                for (int i = 0; i < lineVisible.length && i < vis.size(); i++) {
+                    lineVisible[i] = vis.get(i).getAsBoolean();
+                }
+            }
+            if (obj.has("hudLineFormat") && obj.get("hudLineFormat").isJsonArray()) {
+                JsonArray fmt = obj.getAsJsonArray("hudLineFormat");
+                for (int i = 0; i < lineFormat.length && i < fmt.size(); i++) {
+                    lineFormat[i] = fmt.get(i).isJsonNull() ? HUD_LINE_DEFAULTS[i] : fmt.get(i).getAsString();
+                }
+            }
         } catch (Exception ignored) {
         }
     }
@@ -186,6 +249,16 @@ public final class SwapConfig {
             obj.addProperty("goalCompleted", goalCompleted);
             obj.addProperty("hudX", hudX);
             obj.addProperty("hudY", hudY);
+            JsonArray vis = new JsonArray();
+            for (boolean b : lineVisible) {
+                vis.add(b);
+            }
+            obj.add("hudLineVisible", vis);
+            JsonArray fmt = new JsonArray();
+            for (String s : lineFormat) {
+                fmt.add(s == null ? "" : s);
+            }
+            obj.add("hudLineFormat", fmt);
             Files.writeString(path, new Gson().toJson(obj), StandardCharsets.UTF_8);
         } catch (IOException ignored) {
         }
