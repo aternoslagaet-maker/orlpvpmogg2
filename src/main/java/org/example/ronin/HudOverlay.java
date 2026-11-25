@@ -60,6 +60,11 @@ public final class HudOverlay {
             colors.add(SwapTracker.lastHitColor);
         }
 
+        if (!SwapTracker.lastPearlText.isEmpty()) {
+            lines.add(SwapTracker.lastPearlText);
+            colors.add(SwapTracker.lastPearlColor);
+        }
+
         if (fullProfile) {
             long spearInterval = SwapHistory.getLastSpearInterval();
             Optional<SwapHistory.SwapRecord> lastLunge = SwapHistory.lastLunge();

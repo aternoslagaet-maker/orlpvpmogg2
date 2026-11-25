@@ -3,6 +3,9 @@ package org.example.ronin;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.registry.Registries;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.util.Identifier;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +19,23 @@ public final class SwapConfig {
     public static final long[] SERIES_GAP_CHOICES = {3000, 5000, 10000, 20000, -1};
     public static final int[] VOLUME_CHOICES = {10, 25, 50, 75, 100};
     public static final String[] HUD_PROFILES = {"Минимал для боя", "Полный анализ"};
+
+    public static final String[] SOUND_CHOICES = {
+            "обычный клик", "нотный блок", "колокол (золото)", "плинг", "голова зомби",
+            "голова скелета", "голова крипера", "голова эндер-дракона", "голова визер-скелета", "голова пиглина"
+    };
+    private static final String[] SOUND_IDS = {
+            null,
+            "block.note_block.harp",
+            "block.note_block.bell",
+            "block.note_block.pling",
+            "block.note_block.imitate.zombie",
+            "block.note_block.imitate.skeleton",
+            "block.note_block.imitate.creeper",
+            "block.note_block.imitate.ender_dragon",
+            "block.note_block.imitate.wither_skeleton",
+            "block.note_block.imitate.piglin"
+    };
 
     public static final long BENCHMARK_ONE_TICK_MS = 50;
     public static final long BENCHMARK_STABLE_PVP_MS = 250;
@@ -36,6 +56,7 @@ public final class SwapConfig {
     public static int hudProfile = 1;
     public static boolean soundEnabled = true;
     public static int volumeIndex = 2;
+    public static int soundChoiceIndex = 1;
     public static int metricIndex = 0;
     public static int goalIndex = 0;
     public static int goalProgress = 0;
@@ -70,6 +91,24 @@ public final class SwapConfig {
     public static int nextVolumeIndex() {
         volumeIndex = (volumeIndex + 1) % VOLUME_CHOICES.length;
         return volumeIndex;
+    }
+
+    public static int nextSoundChoiceIndex() {
+        soundChoiceIndex = (soundChoiceIndex + 1) % SOUND_CHOICES.length;
+        return soundChoiceIndex;
+    }
+
+    public static String soundChoiceLabel() {
+        return "Звук свапа: " + SOUND_CHOICES[clamp(soundChoiceIndex, 0, SOUND_CHOICES.length - 1)];
+    }
+
+    public static SoundEvent resolveSound() {
+        int i = clamp(soundChoiceIndex, 0, SOUND_IDS.length - 1);
+        String id = SOUND_IDS[i];
+        if (id == null) {
+            return null;
+        }
+        return Registries.SOUND_EVENT.get(Identifier.of("minecraft", id));
     }
 
     public static int nextHudProfile() {
@@ -118,6 +157,7 @@ public final class SwapConfig {
             hudProfile = clamp(obj.has("hudProfile") ? obj.get("hudProfile").getAsInt() : 1, 0, HUD_PROFILES.length - 1);
             soundEnabled = !obj.has("soundEnabled") || obj.get("soundEnabled").getAsBoolean();
             volumeIndex = clamp(obj.has("volumeIndex") ? obj.get("volumeIndex").getAsInt() : 2, 0, VOLUME_CHOICES.length - 1);
+            soundChoiceIndex = clamp(obj.has("soundChoiceIndex") ? obj.get("soundChoiceIndex").getAsInt() : 1, 0, SOUND_CHOICES.length - 1);
             metricIndex = clamp(obj.has("metricIndex") ? obj.get("metricIndex").getAsInt() : 0, 0, 1);
             goalIndex = clamp(obj.has("goalIndex") ? obj.get("goalIndex").getAsInt() : 0, 0, GOALS.length);
             goalProgress = obj.has("goalProgress") ? Math.max(0, obj.get("goalProgress").getAsInt()) : 0;
@@ -139,6 +179,7 @@ public final class SwapConfig {
             obj.addProperty("hudProfile", hudProfile);
             obj.addProperty("soundEnabled", soundEnabled);
             obj.addProperty("volumeIndex", volumeIndex);
+            obj.addProperty("soundChoiceIndex", soundChoiceIndex);
             obj.addProperty("metricIndex", metricIndex);
             obj.addProperty("goalIndex", goalIndex);
             obj.addProperty("goalProgress", goalProgress);

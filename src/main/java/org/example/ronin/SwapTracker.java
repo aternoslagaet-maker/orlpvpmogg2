@@ -6,6 +6,7 @@ import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.entity.player.ItemCooldownManager;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -23,17 +24,29 @@ public final class SwapTracker {
     public static final long SLOW_TRANSITION_MS = 150;
     public static final long REACH_LATE_SLOT_MS = 60;
     public static final long STALE_ATTACK_MS = 1000;
+    public static final long PEARL_CATCH_WINDOW_MS = 500;
+    public static final float PEARL_UP_OK_DEG = -55.0f;
+    public static final float PEARL_UP_WARN_DEG = -25.0f;
     public static final float AIM_GREEN_MAX_DEG = 5.0f;
 
     public static String lastIssueText = "";
     public static int lastIssueColor = 0xFFAAAAAA;
     public static String lastHitText = "";
     public static int lastHitColor = 0xFF45FF45;
+    public static String lastPearlText = "";
+    public static int lastPearlColor = 0xFF45FF45;
 
     private static ItemStack lastStack = ItemStack.EMPTY;
     private static boolean lastAttackKeyDown = false;
     private static long lastAttackClickMs = -1L;
     private static boolean lastAttackHitEntity = false;
+    private static boolean lastUseKeyDown = false;
+    private static long lastPearlMs = -1L;
+
+    private static ItemStack pendingFrom = null;
+    private static ItemStack pendingTo = null;
+    private static boolean pendingOnCooldown = false;
+    private static long pendingSwapMs = -1L;
 
     private SwapTracker() {
     }
@@ -52,8 +65,15 @@ public final class SwapTracker {
             lastAttackClickMs = now;
             lastAttackHitEntity = client.crosshairTarget != null
                     && client.crosshairTarget.getType() == HitResult.Type.ENTITY;
+            maybeCompletePendingLunge(client, player, now);
         }
         lastAttackKeyDown = attackDown;
+
+        boolean useDown = client.options.useKey.isPressed();
+        if (useDown && !lastUseKeyDown) {
+            onUsePress(client, player, now);
+        }
+        lastUseKeyDown = useDown;
 
         ItemStack current = player.getMainHandStack();
         if (current.getItem() == lastStack.getItem()) {
@@ -66,24 +86,35 @@ public final class SwapTracker {
         boolean fromSpear = SwapHistory.isSpear(from) || matchesSlot(SwapConfig.spearSlot, from);
         boolean toSpear = SwapHistory.isSpear(current) || matchesSlot(SwapConfig.spearSlot, current);
         boolean toIsWeapon = SwapHistory.isWeapon(current);
+        boolean fromIsWeapon = SwapHistory.isWeapon(from);
         long attackGapMs = lastAttackClickMs < 0L ? -1L : now - lastAttackClickMs;
         if (attackGapMs > STALE_ATTACK_MS) {
             attackGapMs = -1L;
         }
-        boolean lungeSwap = toSpear && !fromSpear && attackGapMs >= 0
+        boolean lungeSwap = toSpear && !fromSpear && !fromIsWeapon && attackGapMs >= 0
                 && attackGapMs <= LUNGE_ATTACK_WINDOW_MS;
         boolean reachSwap = fromSpear && !toSpear && toIsWeapon && attackGapMs >= 0
                 && attackGapMs <= REACH_ATTACK_WINDOW_MS;
 
         ItemCooldownManager cooldowns = player.getItemCooldownManager();
         boolean fromOnCooldown = cooldowns.isCoolingDown(from);
+        if (toSpear && !fromSpear && !fromIsWeapon && !lungeSwap && attackGapMs < 0) {
+            pendingFrom = from.copy();
+            pendingTo = current.copy();
+            pendingOnCooldown = fromOnCooldown;
+            pendingSwapMs = now;
+        } else if (!toSpear || fromSpear) {
+            pendingSwapMs = -1L;
+            pendingFrom = null;
+            pendingTo = null;
+        }
         if (fromSpear && !toSpear && toIsWeapon && attackGapMs >= 0) {
             lastHitText = lastAttackHitEntity ? "Дальность: попал по цели ✓" : "Дальность: не попал по цели";
             lastHitColor = lastAttackHitEntity ? 0xFF45FF45 : 0xFFFFA555;
         } else {
             lastHitText = "";
         }
-        diagnose(fromSpear, toSpear, lungeSwap, reachSwap, attackGapMs, fromOnCooldown, toIsWeapon);
+        diagnose(fromSpear, toSpear, lungeSwap, reachSwap, attackGapMs, fromOnCooldown, toIsWeapon, fromIsWeapon);
 
         boolean meaningful = lungeSwap || reachSwap
                 || (SwapHistory.isWeapon(from) && SwapHistory.isWeapon(current) && !toSpear && !fromSpear);
@@ -108,7 +139,7 @@ public final class SwapTracker {
     }
 
     private static void diagnose(boolean fromSpear, boolean toSpear, boolean lungeSwap, boolean reachSwap,
-                                 long attackGapMs, boolean fromOnCooldown, boolean toIsWeapon) {
+                                 long attackGapMs, boolean fromOnCooldown, boolean toIsWeapon, boolean fromIsWeapon) {
         if (lungeSwap) {
             if (fromOnCooldown) {
                 if (attackGapMs > SLOW_TRANSITION_MS) {
@@ -126,6 +157,9 @@ public final class SwapTracker {
             return;
         }
         if (toSpear && !fromSpear) {
+            if (fromIsWeapon) {
+                return;
+            }
             if (attackGapMs >= 0) {
                 lastIssueText = "Поздно свапнул на копьё (удар за " + attackGapMs + " мс)";
                 lastIssueColor = 0xFFFFFF55;
@@ -148,6 +182,96 @@ public final class SwapTracker {
         }
     }
 
+    private static void maybeCompletePendingLunge(MinecraftClient client, ClientPlayerEntity player, long now) {
+        if (pendingSwapMs < 0L || pendingFrom == null || pendingTo == null) {
+            return;
+        }
+        long delayMs = now - pendingSwapMs;
+        boolean stillSpear = player != null && (SwapHistory.isSpear(player.getMainHandStack())
+                || matchesSlot(SwapConfig.spearSlot, player.getMainHandStack()));
+        if (!stillSpear || delayMs > LUNGE_ATTACK_WINDOW_MS) {
+            pendingSwapMs = -1L;
+            pendingFrom = null;
+            pendingTo = null;
+            return;
+        }
+        ItemStack from = pendingFrom;
+        ItemStack to = pendingTo;
+        pendingSwapMs = -1L;
+        pendingFrom = null;
+        pendingTo = null;
+
+        float pitchDeg = player.getPitch(1.0f);
+        boolean fromOnCooldown = pendingOnCooldown;
+        SwapHistory.record(from, to, fromOnCooldown, true, false, delayMs, pitchDeg);
+        if (fromOnCooldown) {
+            if (delayMs > SLOW_TRANSITION_MS) {
+                lastIssueText = "КД: поздний переход — удар за " + delayMs + " мс";
+            } else {
+                lastIssueText = "КД: слишком рано — снятый предмет ещё остывает";
+            }
+            lastIssueColor = 0xFFFF5555;
+        } else if (delayMs > SLOW_TRANSITION_MS) {
+            lastIssueText = "Свап с опозданием приёма — удар через " + delayMs + " мс после слота";
+            lastIssueColor = 0xFFFFFF55;
+        } else {
+            lastIssueText = "";
+        }
+        LOGGER.info("Парный свап (слот→ЛКМ): {} -> {} (удар через {} мс, КД снятого: {})",
+                itemId(from), itemId(to), delayMs, fromOnCooldown);
+        playLungeSound(client, !fromOnCooldown, pitchDeg);
+        updateGoal(client, player, !fromOnCooldown, pitchDeg);
+        SwapConfig.save();
+    }
+
+    private static void onUsePress(MinecraftClient client, ClientPlayerEntity player, long now) {
+        String id = itemId(player.getMainHandStack());
+        if (id.endsWith("ender_pearl")) {
+            lastPearlMs = now;
+            float pitch = player.getPitch(1.0f);
+            if (pitch > PEARL_UP_WARN_DEG) {
+                lastPearlText = "Перлинг: прицел низковат (" + String.format("%.0f°", pitch) + ") — надо вверх";
+                lastPearlColor = 0xFFFFA555;
+            } else {
+                lastPearlText = "Перлинг: жемчуг брошен — сразу же заряд!";
+                lastPearlColor = 0xFFAAAAAA;
+            }
+        } else if (id.endsWith("wind_charge")) {
+            if (lastPearlMs < 0L) {
+                lastPearlText = "Перлинг: сначала кинь жемчуг";
+                lastPearlColor = 0xFFFFFF55;
+                return;
+            }
+            long delayMs = now - lastPearlMs;
+            lastPearlMs = -1L;
+            if (delayMs > PEARL_CATCH_WINDOW_MS) {
+                lastPearlText = "Перлинг: поздно, заряд за " + delayMs + " мс — не догонит";
+                lastPearlColor = 0xFFFFFF55;
+                return;
+            }
+            float pitch = player.getPitch(1.0f);
+            if (pitch > PEARL_UP_OK_DEG) {
+                lastPearlText = "Перлинг: прицел низкий (" + String.format("%.0f°", pitch) + ") — почти вертикально";
+                lastPearlColor = 0xFFFFA555;
+                return;
+            }
+            boolean boosted = player.getVelocity().y > 0.1;
+            lastPearlText = boosted ? "Перлинг: поймаю ✓ (~30 блоков, усиленный)" : "Перлинг: поймаю ✓ (~20 блоков)";
+            lastPearlColor = 0xFF45FF45;
+        }
+    }
+
+    public static void previewSound(MinecraftClient client) {
+        if (!SwapConfig.soundEnabled || client == null) {
+            return;
+        }
+        SoundEvent ev = SwapConfig.resolveSound();
+        if (ev == null) {
+            ev = SoundEvents.UI_BUTTON_CLICK.value();
+        }
+        client.getSoundManager().play(PositionedSoundInstance.ui(ev, 1.0f, SwapConfig.soundVolume()));
+    }
+
     private static void playLungeSound(MinecraftClient client, boolean effective, float pitchDeg) {
         if (!SwapConfig.soundEnabled) {
             return;
@@ -156,8 +280,11 @@ public final class SwapTracker {
         boolean greenAim = Math.abs(pitchDeg) <= AIM_GREEN_MAX_DEG;
         float pitch = effective ? (greenAim ? 1.5f : 1.2f) : 0.4f;
         float playVolume = effective ? volume : Math.max(0.02f, volume * 0.25f);
-        client.getSoundManager().play(PositionedSoundInstance.ui(
-                SoundEvents.UI_BUTTON_CLICK.value(), pitch, playVolume));
+        SoundEvent ev = SwapConfig.resolveSound();
+        if (ev == null) {
+            ev = SoundEvents.UI_BUTTON_CLICK.value();
+        }
+        client.getSoundManager().play(PositionedSoundInstance.ui(ev, pitch, playVolume));
     }
 
     private static void updateGoal(MinecraftClient client, ClientPlayerEntity player,

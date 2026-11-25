@@ -141,6 +141,13 @@ public class SwapHistoryScreen extends Screen {
                 SwapConfig.hudY = 3;
                 SwapConfig.save();
             }).dimensions(this.width / 2 - 150, this.height - 156, 145, 20).build());
+
+            addDrawableChild(ButtonWidget.builder(Text.literal(SwapConfig.soundChoiceLabel()), b -> {
+                SwapConfig.nextSoundChoiceIndex();
+                SwapConfig.save();
+                b.setMessage(Text.literal(SwapConfig.soundChoiceLabel()));
+                SwapTracker.previewSound(this.client);
+            }).dimensions(this.width / 2 + 5, this.height - 156, 145, 20).build());
         }
     }
 
