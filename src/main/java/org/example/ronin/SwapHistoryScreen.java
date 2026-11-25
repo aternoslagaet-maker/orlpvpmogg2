@@ -20,6 +20,12 @@ public class SwapHistoryScreen extends Screen {
     private static final int TAB_STATS = 1;
     private static final int TAB_SETTINGS = 2;
 
+    private static final String TITLE = "История свапов";
+    private static final int SCREEN_BG = 0xEE17181A;
+    private static final int PANEL_BG = 0xFF2A2D31;
+    private static final int PANEL_BORDER = 0xFF464B52;
+    private static final int ACCENT_LINE = 0xFF4CAF50;
+
     private static final int ROWS_PER_PAGE = 8;
     private static final int ROW_HEIGHT = 22;
     private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("HH:mm:ss");
@@ -48,45 +54,56 @@ public class SwapHistoryScreen extends Screen {
     @Override
     protected void init() {
         int tabX = this.width / 2 - 117;
-        addDrawableChild(ButtonWidget.builder(Text.literal("История"), b -> switchTab(TAB_HISTORY))
-                .dimensions(tabX, 6, 78, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Статистика"), b -> switchTab(TAB_STATS))
-                .dimensions(tabX + 78, 6, 78, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Настройки"), b -> switchTab(TAB_SETTINGS))
-                .dimensions(tabX + 156, 6, 78, 18).build());
+        ButtonWidget historyTab = addDrawableChild(ButtonWidget.builder(Text.literal("История"), b -> switchTab(TAB_HISTORY))
+                .dimensions(tabX, 22, 78, 18).build());
+        ButtonWidget statsTab = addDrawableChild(ButtonWidget.builder(Text.literal("Статистика"), b -> switchTab(TAB_STATS))
+                .dimensions(tabX + 78, 22, 78, 18).build());
+        ButtonWidget settingsTab = addDrawableChild(ButtonWidget.builder(Text.literal("Настройки"), b -> switchTab(TAB_SETTINGS))
+                .dimensions(tabX + 156, 22, 78, 18).build());
+        if (this.tab == TAB_HISTORY) {
+            historyTab.setMessage(Text.literal("История").formatted(Formatting.GREEN));
+        } else if (this.tab == TAB_STATS) {
+            statsTab.setMessage(Text.literal("Статистика").formatted(Formatting.GREEN));
+        } else {
+            settingsTab.setMessage(Text.literal("Настройки").formatted(Formatting.GREEN));
+        }
 
         int y = this.height - 26;
         addDrawableChild(ButtonWidget.builder(Text.literal("Закрыть"), b -> this.close())
-                .dimensions(this.width / 2 + 70, y, 120, 20).build());
+                .dimensions(this.width / 2 - 190, y, 120, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Сохранить и выйти").formatted(Formatting.GREEN), b -> {
+            SwapConfig.save();
+            this.close();
+        }).dimensions(this.width / 2 + 70, y, 120, 20).build());
 
         if (this.tab == TAB_HISTORY) {
             this.prevButton = addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
                 if (this.page > 0) {
                     this.page--;
                 }
-            }).dimensions(this.width / 2 - 200, y, 60, 20).build());
+            }).dimensions(this.width / 2 - 200, this.height - 56, 60, 20).build());
 
             this.nextButton = addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
                 this.page++;
-            }).dimensions(this.width / 2 - 130, y, 60, 20).build());
+            }).dimensions(this.width / 2 - 130, this.height - 56, 60, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal("Очистить"), b -> {
                 SwapHistory.clear();
                 this.page = 0;
-            }).dimensions(this.width / 2 - 60, y, 120, 20).build());
+            }).dimensions(this.width / 2 - 60, this.height - 56, 120, 20).build());
         } else if (this.tab == TAB_STATS) {
             addDrawableChild(ButtonWidget.builder(Text.literal(metricLabel()), b -> {
                 SwapConfig.nextMetricIndex();
                 SwapConfig.save();
                 b.setMessage(Text.literal(metricLabel()));
-            }).dimensions(this.width / 2 - 200, y, 190, 20).build());
+            }).dimensions(this.width / 2 - 200, this.height - 56, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal("Экспорт статистики"), b -> {
                 StatsExporter.exportSession();
                 StatsExporter.mergeAllTime();
                 this.exported = true;
                 b.setMessage(Text.literal("Экспортировано ✓"));
-            }).dimensions(this.width / 2 + 10, y, 190, 20).build());
+            }).dimensions(this.width / 2 + 10, this.height - 56, 190, 20).build());
         } else {
             addDrawableChild(ButtonWidget.builder(Text.literal(spearSlotLabel()), b -> {
                 SwapConfig.spearSlot = SwapConfig.nextSlot(SwapConfig.spearSlot);
@@ -159,6 +176,19 @@ public class SwapHistoryScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        context.fill(0, 0, this.width, this.height, SCREEN_BG);
+        int pl = this.width / 2 - 235;
+        int pr = this.width / 2 + 235;
+        int pt = 44;
+        int pb = this.height - 38;
+        context.fill(pl, pt, pr, pb, PANEL_BG);
+        context.fill(pl, pt, pr, pt + 1, PANEL_BORDER);
+        context.fill(pl, pb - 1, pr, pb, PANEL_BORDER);
+        context.fill(pl, pt, pl + 1, pb, PANEL_BORDER);
+        context.fill(pr - 1, pt, pr, pb, PANEL_BORDER);
+        context.fill(pl + 16, pt + 15, pr - 16, pt + 17, ACCENT_LINE);
+        context.drawCenteredTextWithShadow(this.textRenderer, TITLE, this.width / 2, 5, 0xFFFFFFFF);
+
         super.render(context, mouseX, mouseY, delta);
 
         if (this.tab == TAB_HISTORY) {
@@ -189,7 +219,7 @@ public class SwapHistoryScreen extends Screen {
                 + " | рывков: " + SwapHistory.getLungeCount()
                 + " | дальность: " + SwapHistory.getReachCount()
                 + " | серия: " + SwapHistory.getBestSeries();
-        context.drawCenteredTextWithShadow(this.textRenderer, meta, this.width / 2, 28, 0xAAAAAA);
+        context.drawCenteredTextWithShadow(this.textRenderer, meta, this.width / 2, 52, 0xAAAAAA);
 
         this.rowBounds.clear();
         this.visibleRows.clear();
@@ -197,7 +227,7 @@ public class SwapHistoryScreen extends Screen {
         if (total == 0) {
             context.drawCenteredTextWithShadow(this.textRenderer,
                     Text.literal("Рабочих свапов (рывок/дальность) пока не было — остальное не пишется"),
-                    this.width / 2, 60, 0xAAAAAA);
+                    this.width / 2, 110, 0xAAAAAA);
             return;
         }
 
@@ -205,7 +235,7 @@ public class SwapHistoryScreen extends Screen {
         int end = Math.min(total - this.page * ROWS_PER_PAGE, total);
 
         int x = this.width / 2 - 100;
-        int y = 42;
+        int y = 66;
 
         for (int i = end - 1; i >= start; i--) {
             SwapHistory.SwapRecord r = records.get(i);
@@ -223,10 +253,10 @@ public class SwapHistoryScreen extends Screen {
 
     private void renderStatsTab(DrawContext context) {
         int x = this.width / 2 - 130;
-        int y = 40;
+        int y = 56;
 
         context.drawCenteredTextWithShadow(this.textRenderer,
-                Text.literal("Статистика"), this.width / 2, 28, 0xFFFFFF);
+                Text.literal("Статистика"), this.width / 2, 34, 0xFFFFFF);
 
         long lunges = SwapHistory.getLungeCount();
         long effective = SwapHistory.getEffectiveLungeCount();
@@ -328,10 +358,10 @@ public class SwapHistoryScreen extends Screen {
     private void renderSettingsTab(DrawContext context) {
         context.drawCenteredTextWithShadow(this.textRenderer,
                 "Все настройки сохраняются в config/orlpvpmogg.json",
-                this.width / 2, 26, 0xAAAAAA);
+                this.width / 2, 52, 0xAAAAAA);
         context.drawCenteredTextWithShadow(this.textRenderer,
                 "Зажми ЛКМ на HUD и тяни — позиция сохранится автоматически",
-                this.width / 2, 38, 0xFFFFD455);
+                this.width / 2, 64, 0xFFFFD455);
     }
 
     private void renderRow(DrawContext context, SwapHistory.SwapRecord r, int x, int y) {
