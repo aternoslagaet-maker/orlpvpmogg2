@@ -21,10 +21,6 @@ public class SwapHistoryScreen extends Screen {
     private static final int TAB_SETTINGS = 2;
 
     private static final String TITLE = "История свапов";
-    private static final int SCREEN_BG = 0xEE17181A;
-    private static final int PANEL_BG = 0xFF2A2D31;
-    private static final int PANEL_BORDER = 0xFF464B52;
-    private static final int ACCENT_LINE = 0xFF4CAF50;
 
     private static final int ROWS_PER_PAGE = 8;
     private static final int ROW_HEIGHT = 22;
@@ -53,13 +49,13 @@ public class SwapHistoryScreen extends Screen {
 
     @Override
     protected void init() {
-        int tabX = this.width / 2 - 117;
+        int tabX = this.width / 2 - 135;
         ButtonWidget historyTab = addDrawableChild(ButtonWidget.builder(Text.literal("История"), b -> switchTab(TAB_HISTORY))
-                .dimensions(tabX, 22, 78, 18).build());
+                .dimensions(tabX, 20, 90, 20).build());
         ButtonWidget statsTab = addDrawableChild(ButtonWidget.builder(Text.literal("Статистика"), b -> switchTab(TAB_STATS))
-                .dimensions(tabX + 78, 22, 78, 18).build());
+                .dimensions(tabX + 90, 20, 90, 20).build());
         ButtonWidget settingsTab = addDrawableChild(ButtonWidget.builder(Text.literal("Настройки"), b -> switchTab(TAB_SETTINGS))
-                .dimensions(tabX + 156, 22, 78, 18).build());
+                .dimensions(tabX + 180, 20, 90, 20).build());
         if (this.tab == TAB_HISTORY) {
             historyTab.setMessage(Text.literal("История").formatted(Formatting.GREEN));
         } else if (this.tab == TAB_STATS) {
@@ -68,103 +64,103 @@ public class SwapHistoryScreen extends Screen {
             settingsTab.setMessage(Text.literal("Настройки").formatted(Formatting.GREEN));
         }
 
-        int y = this.height - 26;
+        int y = this.height - 30;
         addDrawableChild(ButtonWidget.builder(Text.literal("Закрыть"), b -> this.close())
-                .dimensions(this.width / 2 - 190, y, 120, 20).build());
+                .dimensions(this.width / 2 - 170, y, 140, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("Сохранить и выйти").formatted(Formatting.GREEN), b -> {
             SwapConfig.save();
             this.close();
-        }).dimensions(this.width / 2 + 70, y, 120, 20).build());
+        }).dimensions(this.width / 2 + 30, y, 140, 20).build());
 
         if (this.tab == TAB_HISTORY) {
             this.prevButton = addDrawableChild(ButtonWidget.builder(Text.literal("<"), b -> {
                 if (this.page > 0) {
                     this.page--;
                 }
-            }).dimensions(this.width / 2 - 200, this.height - 56, 60, 20).build());
+            }).dimensions(this.width / 2 - 220, this.height - 56, 70, 20).build());
 
             this.nextButton = addDrawableChild(ButtonWidget.builder(Text.literal(">"), b -> {
                 this.page++;
-            }).dimensions(this.width / 2 - 130, this.height - 56, 60, 20).build());
+            }).dimensions(this.width / 2 - 140, this.height - 56, 70, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal("Очистить"), b -> {
                 SwapHistory.clear();
                 this.page = 0;
-            }).dimensions(this.width / 2 - 60, this.height - 56, 120, 20).build());
+            }).dimensions(this.width / 2 - 60, this.height - 56, 140, 20).build());
         } else if (this.tab == TAB_STATS) {
             addDrawableChild(ButtonWidget.builder(Text.literal(metricLabel()), b -> {
                 SwapConfig.nextMetricIndex();
                 SwapConfig.save();
                 b.setMessage(Text.literal(metricLabel()));
-            }).dimensions(this.width / 2 - 200, this.height - 56, 190, 20).build());
+            }).dimensions(this.width / 2 - 210, this.height - 56, 200, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal("Экспорт статистики"), b -> {
                 StatsExporter.exportSession();
                 StatsExporter.mergeAllTime();
                 this.exported = true;
                 b.setMessage(Text.literal("Экспортировано ✓"));
-            }).dimensions(this.width / 2 + 10, this.height - 56, 190, 20).build());
+            }).dimensions(this.width / 2 + 10, this.height - 56, 200, 20).build());
         } else {
             addDrawableChild(ButtonWidget.builder(Text.literal(spearSlotLabel()), b -> {
                 SwapConfig.spearSlot = SwapConfig.nextSlot(SwapConfig.spearSlot);
                 SwapConfig.save();
                 b.setMessage(Text.literal(spearSlotLabel()));
-            }).dimensions(this.width / 2 - 150, this.height - 52, 145, 20).build());
+            }).dimensions(this.width / 2 - 195, this.height - 52, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal(partnerSlotLabel()), b -> {
                 SwapConfig.partnerSlot = SwapConfig.nextSlot(SwapConfig.partnerSlot);
                 SwapConfig.save();
                 b.setMessage(Text.literal(partnerSlotLabel()));
-            }).dimensions(this.width / 2 + 5, this.height - 52, 145, 20).build());
+            }).dimensions(this.width / 2 + 5, this.height - 52, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal(seriesGapLabel()), b -> {
                 SwapConfig.seriesGapMs = SwapConfig.nextSeriesGap(SwapConfig.seriesGapMs);
                 SwapConfig.save();
                 b.setMessage(Text.literal(seriesGapLabel()));
-            }).dimensions(this.width / 2 - 150, this.height - 78, 145, 20).build());
+            }).dimensions(this.width / 2 - 195, this.height - 78, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal(SwapConfig.hudProfileLabel()), b -> {
                 SwapConfig.nextHudProfile();
                 SwapConfig.save();
                 b.setMessage(Text.literal(SwapConfig.hudProfileLabel()));
-            }).dimensions(this.width / 2 + 5, this.height - 78, 145, 20).build());
+            }).dimensions(this.width / 2 + 5, this.height - 78, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal(soundLabel()), b -> {
                 SwapConfig.soundEnabled = !SwapConfig.soundEnabled;
                 SwapConfig.save();
                 b.setMessage(Text.literal(soundLabel()));
-            }).dimensions(this.width / 2 - 150, this.height - 104, 145, 20).build());
+            }).dimensions(this.width / 2 - 195, this.height - 104, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal(volumeLabel()), b -> {
                 SwapConfig.nextVolumeIndex();
                 SwapConfig.save();
                 b.setMessage(Text.literal(volumeLabel()));
-            }).dimensions(this.width / 2 + 5, this.height - 104, 145, 20).build());
+            }).dimensions(this.width / 2 + 5, this.height - 104, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal(goalLabel()), b -> {
                 SwapConfig.nextGoalIndex();
                 SwapConfig.save();
                 b.setMessage(Text.literal(goalLabel()));
-            }).dimensions(this.width / 2 - 150, this.height - 130, 145, 20).build());
+            }).dimensions(this.width / 2 - 195, this.height - 130, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal("Сброс цели"), b -> {
                 SwapConfig.goalProgress = 0;
                 SwapConfig.goalCompleted = false;
                 SwapConfig.save();
-            }).dimensions(this.width / 2 + 5, this.height - 130, 145, 20).build());
+            }).dimensions(this.width / 2 + 5, this.height - 130, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal("Вернуть HUD в угол"), b -> {
                 SwapConfig.hudX = 3;
                 SwapConfig.hudY = 3;
                 SwapConfig.save();
-            }).dimensions(this.width / 2 - 150, this.height - 156, 145, 20).build());
+            }).dimensions(this.width / 2 - 195, this.height - 156, 190, 20).build());
 
             addDrawableChild(ButtonWidget.builder(Text.literal(SwapConfig.soundChoiceLabel()), b -> {
                 SwapConfig.nextSoundChoiceIndex();
                 SwapConfig.save();
                 b.setMessage(Text.literal(SwapConfig.soundChoiceLabel()));
                 SwapTracker.previewSound(this.client);
-            }).dimensions(this.width / 2 + 5, this.height - 156, 145, 20).build());
+            }).dimensions(this.width / 2 + 5, this.height - 156, 190, 20).build());
         }
     }
 
@@ -176,20 +172,8 @@ public class SwapHistoryScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, this.width, this.height, SCREEN_BG);
-        int pl = this.width / 2 - 235;
-        int pr = this.width / 2 + 235;
-        int pt = 44;
-        int pb = this.height - 38;
-        context.fill(pl, pt, pr, pb, PANEL_BG);
-        context.fill(pl, pt, pr, pt + 1, PANEL_BORDER);
-        context.fill(pl, pb - 1, pr, pb, PANEL_BORDER);
-        context.fill(pl, pt, pl + 1, pb, PANEL_BORDER);
-        context.fill(pr - 1, pt, pr, pb, PANEL_BORDER);
-        context.fill(pl + 16, pt + 15, pr - 16, pt + 17, ACCENT_LINE);
-        context.drawCenteredTextWithShadow(this.textRenderer, TITLE, this.width / 2, 5, 0xFFFFFFFF);
-
         super.render(context, mouseX, mouseY, delta);
+        context.drawCenteredTextWithShadow(this.textRenderer, TITLE, this.width / 2, 5, 0xFFFFFFFF);
 
         if (this.tab == TAB_HISTORY) {
             renderHistoryTab(context, mouseX, mouseY);
