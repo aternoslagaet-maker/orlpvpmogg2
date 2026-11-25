@@ -12,7 +12,7 @@ public class HudEditorScreen extends Screen {
     private static final int COLOR_TEXT = 0xFFFFFFFF;
     private static final int COLOR_GRAY = 0xFFAAAAAA;
 
-    private static final String[][] PLACEHOLDER_HELP = {
+    private static final String[] PLACEHOLDER_HELP = {
             "{delta} — время свапа   {lunge} — Δ рывка   {series} — серия",
             "{cd} — метка КД   {record} — рекорд пары   {pitch} — прицел",
             "{goal} — цель   {issue} — диагностика   {hit} — попадание",
@@ -98,7 +98,7 @@ public class HudEditorScreen extends Screen {
 
         context.drawTextWithShadow(this.textRenderer, "Подстановки:", rx, 120, COLOR_GRAY);
         int y = 132;
-        for (String[] help : PLACEHOLDER_HELP) {
+        for (String help : PLACEHOLDER_HELP) {
             context.drawTextWithShadow(this.textRenderer, help, rx, y, COLOR_TEXT);
             y += 11;
         }

@@ -58,7 +58,7 @@ public final class HudOverlay {
 
         List<String> lines = new ArrayList<>();
         List<Integer> colors = new ArrayList<>();
-        for (int i = 0; i < SwapConfig.HUD_LINE_COUNT; i++) {
+        for (int i = 0; i < SwapConfig.hudLineCount(); i++) {
             if (!SwapConfig.hudLineVisible(i)) {
                 continue;
             }
