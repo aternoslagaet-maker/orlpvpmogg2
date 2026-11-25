@@ -46,6 +46,7 @@ public final class SwapTracker {
     private static ItemStack pendingFrom = null;
     private static ItemStack pendingTo = null;
     private static boolean pendingOnCooldown = false;
+    private static boolean pendingIsLunge = true;
     private static long pendingSwapMs = -1L;
 
     private SwapTracker() {
@@ -65,7 +66,7 @@ public final class SwapTracker {
             lastAttackClickMs = now;
             lastAttackHitEntity = client.crosshairTarget != null
                     && client.crosshairTarget.getType() == HitResult.Type.ENTITY;
-            maybeCompletePendingLunge(client, player, now);
+            completePendingSwap(client, player, now);
         }
         lastAttackKeyDown = attackDown;
 
@@ -98,12 +99,15 @@ public final class SwapTracker {
 
         ItemCooldownManager cooldowns = player.getItemCooldownManager();
         boolean fromOnCooldown = cooldowns.isCoolingDown(from);
-        if (toSpear && !fromSpear && !fromIsWeapon && !lungeSwap && attackGapMs < 0) {
+        boolean pendingCase = (toSpear && !fromSpear && !fromIsWeapon && !lungeSwap && attackGapMs < 0)
+                || (fromSpear && !toSpear && toIsWeapon && !reachSwap && attackGapMs < 0);
+        if (pendingCase) {
+            pendingIsLunge = toSpear;
             pendingFrom = from.copy();
             pendingTo = current.copy();
             pendingOnCooldown = fromOnCooldown;
             pendingSwapMs = now;
-        } else if (!toSpear || fromSpear) {
+        } else {
             pendingSwapMs = -1L;
             pendingFrom = null;
             pendingTo = null;
@@ -114,7 +118,7 @@ public final class SwapTracker {
         } else {
             lastHitText = "";
         }
-        diagnose(fromSpear, toSpear, lungeSwap, reachSwap, attackGapMs, fromOnCooldown, toIsWeapon, fromIsWeapon);
+        diagnose(client, fromSpear, toSpear, lungeSwap, reachSwap, attackGapMs, fromOnCooldown, toIsWeapon, fromIsWeapon);
 
         boolean meaningful = lungeSwap || reachSwap
                 || (SwapHistory.isWeapon(from) && SwapHistory.isWeapon(current) && !toSpear && !fromSpear);
@@ -138,8 +142,9 @@ public final class SwapTracker {
         }
     }
 
-    private static void diagnose(boolean fromSpear, boolean toSpear, boolean lungeSwap, boolean reachSwap,
-                                 long attackGapMs, boolean fromOnCooldown, boolean toIsWeapon, boolean fromIsWeapon) {
+    private static void diagnose(MinecraftClient client, boolean fromSpear, boolean toSpear, boolean lungeSwap,
+                                 boolean reachSwap, long attackGapMs, boolean fromOnCooldown,
+                                 boolean toIsWeapon, boolean fromIsWeapon) {
         if (lungeSwap) {
             if (fromOnCooldown) {
                 if (attackGapMs > SLOW_TRANSITION_MS) {
@@ -163,6 +168,7 @@ public final class SwapTracker {
             if (attackGapMs >= 0) {
                 lastIssueText = "Поздно свапнул на копьё (удар за " + attackGapMs + " мс)";
                 lastIssueColor = 0xFFFFFF55;
+                playSwapSound(client, false);
             }
             return;
         }
@@ -173,23 +179,33 @@ public final class SwapTracker {
             if (attackGapMs >= 0) {
                 lastIssueText = "Поздно ударил (" + attackGapMs + " мс) — дальность не засчитана";
                 lastIssueColor = 0xFFFFFF55;
+                playSwapSound(client, false);
             }
             return;
         }
-        if (reachSwap && attackGapMs > REACH_LATE_SLOT_MS) {
-            lastIssueText = "Дальность: слот поздновато (удар за " + attackGapMs + " мс)";
-            lastIssueColor = 0xFFFFFF55;
+        if (reachSwap) {
+            if (attackGapMs > REACH_LATE_SLOT_MS) {
+                lastIssueText = "Дальность: слот поздновато (удар за " + attackGapMs + " мс)";
+                lastIssueColor = 0xFFFFFF55;
+                playSwapSound(client, false);
+            } else {
+                lastIssueText = "";
+                playSwapSound(client, true);
+            }
         }
     }
 
-    private static void maybeCompletePendingLunge(MinecraftClient client, ClientPlayerEntity player, long now) {
-        if (pendingSwapMs < 0L || pendingFrom == null || pendingTo == null) {
+    private static void completePendingSwap(MinecraftClient client, ClientPlayerEntity player, long now) {
+        if (pendingSwapMs < 0L || pendingFrom == null || pendingTo == null || player == null) {
             return;
         }
+        ItemStack held = player.getMainHandStack();
+        boolean stillSpear = SwapHistory.isSpear(held) || matchesSlot(SwapConfig.spearSlot, held);
+        boolean stillWeapon = SwapHistory.isWeapon(held);
         long delayMs = now - pendingSwapMs;
-        boolean stillSpear = player != null && (SwapHistory.isSpear(player.getMainHandStack())
-                || matchesSlot(SwapConfig.spearSlot, player.getMainHandStack()));
-        if (!stillSpear || delayMs > LUNGE_ATTACK_WINDOW_MS) {
+        long window = pendingIsLunge ? LUNGE_ATTACK_WINDOW_MS : REACH_ATTACK_WINDOW_MS;
+        boolean stillTarget = pendingIsLunge ? stillSpear : stillWeapon;
+        if (!stillTarget || delayMs > window) {
             pendingSwapMs = -1L;
             pendingFrom = null;
             pendingTo = null;
@@ -197,31 +213,48 @@ public final class SwapTracker {
         }
         ItemStack from = pendingFrom;
         ItemStack to = pendingTo;
+        boolean fromOnCooldown = pendingOnCooldown;
+        boolean isLunge = pendingIsLunge;
         pendingSwapMs = -1L;
         pendingFrom = null;
         pendingTo = null;
 
         float pitchDeg = player.getPitch(1.0f);
-        boolean fromOnCooldown = pendingOnCooldown;
-        SwapHistory.record(from, to, fromOnCooldown, true, false, delayMs, pitchDeg);
-        if (fromOnCooldown) {
-            if (delayMs > SLOW_TRANSITION_MS) {
-                lastIssueText = "КД: поздний переход — удар за " + delayMs + " мс";
+        if (isLunge) {
+            SwapHistory.record(from, to, fromOnCooldown, true, false, delayMs, pitchDeg);
+            if (fromOnCooldown) {
+                if (delayMs > SLOW_TRANSITION_MS) {
+                    lastIssueText = "КД: поздний переход — удар за " + delayMs + " мс";
+                } else {
+                    lastIssueText = "КД: слишком рано — снятый предмет ещё остывает";
+                }
+                lastIssueColor = 0xFFFF5555;
+            } else if (delayMs > SLOW_TRANSITION_MS) {
+                lastIssueText = "Свап с опозданием приёма — удар через " + delayMs + " мс после слота";
+                lastIssueColor = 0xFFFFFF55;
             } else {
-                lastIssueText = "КД: слишком рано — снятый предмет ещё остывает";
+                lastIssueText = "";
             }
-            lastIssueColor = 0xFFFF5555;
-        } else if (delayMs > SLOW_TRANSITION_MS) {
-            lastIssueText = "Свап с опозданием приёма — удар через " + delayMs + " мс после слота";
-            lastIssueColor = 0xFFFFFF55;
+            LOGGER.info("Парный свап рывок (слот→ЛКМ): {} -> {} (удар через {} мс, КД снятого: {})",
+                    itemId(from), itemId(to), delayMs, fromOnCooldown);
+            playLungeSound(client, !fromOnCooldown, pitchDeg);
+            updateGoal(client, player, !fromOnCooldown, pitchDeg);
+            SwapConfig.save();
         } else {
-            lastIssueText = "";
+            SwapHistory.record(from, to, fromOnCooldown, false, true, delayMs, pitchDeg);
+            if (delayMs > REACH_LATE_SLOT_MS) {
+                lastIssueText = "Свап с опозданием приёма — удар через " + delayMs + " мс после слота";
+                lastIssueColor = 0xFFFFFF55;
+            } else {
+                lastIssueText = "";
+            }
+            lastHitText = lastAttackHitEntity ? "Дальность: попал по цели ✓" : "Дальность: не попал по цели";
+            lastHitColor = lastAttackHitEntity ? 0xFF45FF45 : 0xFFFFA555;
+            LOGGER.info("Парный свап дальность (слот→ЛКМ): {} -> {} (удар через {} мс)",
+                    itemId(from), itemId(to), delayMs);
+            playSwapSound(client, delayMs <= REACH_LATE_SLOT_MS);
+            SwapConfig.save();
         }
-        LOGGER.info("Парный свап (слот→ЛКМ): {} -> {} (удар через {} мс, КД снятого: {})",
-                itemId(from), itemId(to), delayMs, fromOnCooldown);
-        playLungeSound(client, !fromOnCooldown, pitchDeg);
-        updateGoal(client, player, !fromOnCooldown, pitchDeg);
-        SwapConfig.save();
     }
 
     private static void onUsePress(MinecraftClient client, ClientPlayerEntity player, long now) {
@@ -259,6 +292,20 @@ public final class SwapTracker {
             lastPearlText = boosted ? "Перлинг: поймаю ✓ (~30 блоков, усиленный)" : "Перлинг: поймаю ✓ (~20 блоков)";
             lastPearlColor = 0xFF45FF45;
         }
+    }
+
+    private static void playSwapSound(MinecraftClient client, boolean ok) {
+        if (!SwapConfig.soundEnabled || client == null) {
+            return;
+        }
+        float volume = SwapConfig.soundVolume();
+        float pitch = ok ? 1.3f : 0.4f;
+        float playVolume = ok ? volume : Math.max(0.02f, volume * 0.25f);
+        SoundEvent ev = SwapConfig.resolveSound();
+        if (ev == null) {
+            ev = SoundEvents.UI_BUTTON_CLICK.value();
+        }
+        client.getSoundManager().play(PositionedSoundInstance.ui(ev, pitch, playVolume));
     }
 
     public static void previewSound(MinecraftClient client) {

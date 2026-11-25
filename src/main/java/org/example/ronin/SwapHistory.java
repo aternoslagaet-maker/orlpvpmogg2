@@ -73,18 +73,22 @@ public final class SwapHistory {
         int series = 0;
         long recordDiffMs = NO_PREV_RECORD;
         if (lungeSwap) {
-            SwapRecord prevLunge = null;
-            for (int i = all.size() - 1; i >= 0; i--) {
-                if (all.get(i).lungeSwap()) {
-                    prevLunge = all.get(i);
-                    break;
-                }
-            }
-            if (prevLunge != null && (SwapConfig.seriesGapMs < 0
-                    || now - prevLunge.timeMs() <= SwapConfig.seriesGapMs)) {
-                series = prevLunge.lungeSeries() + 1;
+            if (fromOnCooldown) {
+                series = 0;
             } else {
-                series = 1;
+                SwapRecord prevLunge = null;
+                for (int i = all.size() - 1; i >= 0; i--) {
+                    if (all.get(i).lungeSwap() && !all.get(i).fromOnCooldown()) {
+                        prevLunge = all.get(i);
+                        break;
+                    }
+                }
+                if (prevLunge != null && (SwapConfig.seriesGapMs < 0
+                        || now - prevLunge.timeMs() <= SwapConfig.seriesGapMs)) {
+                    series = prevLunge.lungeSeries() + 1;
+                } else {
+                    series = 1;
+                }
             }
 
             String key = pairKey(from, to);
